@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3.js Globe with Life Expectancy and Bar Charts</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Style for the tooltip */
+        .tooltip {
+            position: absolute;
+            background-color: white;
+            border: 1px solid #ccc;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            pointer-events: none;
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+        }
+        #controls {
+            float: right;
+            width: 200px;
+            margin-right: 20px;
+        }
+        #search-bar {
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        #country-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+        .country-checkbox {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <input type="text" id="search-bar" placeholder="Search for a country...">
+        <div>
+            <input type="checkbox" id="select-all"> Select All
+        </div>
+        <div id="country-list">
+            <!-- Dynamic list of countries will be added here -->
+        </div>
+    </div>
+
+    <svg id="globe" width="800" height="600"></svg>
+
+    <!-- Tooltip container -->
+    <div class="tooltip" id="tooltip" style="display: none;"></div>
+
+    <script>
+        // Set up the SVG and projection
+        const width = 800, height = 600;
+        const svg = d3.select("#globe")
+            .attr("width", width)
+            .attr("height", height);
+
+        const tooltip = d3.select("#tooltip"); // Tooltip element
+
+        const projection = d3.geoOrthographic()
+            .scale(300)
+            .translate([width / 2, height / 2]);
+
+        const path = d3.geoPath().projection(projection);
+
+        // Define global variables for current year and life expectancy data
+        let currentYear = 2000;
+        let lifeExpectancyData;
+        let rotationSpeed = 0.1; // Rotation speed per tick
+        let rotateAngle = 0; // Current rotation angle
+        let rotating = true; // Variable to track if the globe is rotating
+        let dragging = false; // Track if the user is dragging
+
+        // Color scale for life expectancy (adjust based on data)
+        const colorScale = d3.scaleLinear()
+            .range(["#1f77b4", "#ff7f0e"]);
+
+        // Scales for GDP and vaccination bar charts
+        const gdpaScale = d3.scaleLinear().range([0, 50]); // Max bar height 50 for %gdpa
+        const vaccinationScale = d3.scaleLinear().range([0, 50]); // Max bar height 50 for %vaccinated
+
+        // Load and display world map and data
+        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(geojson) {
+            d3.csv("lifeexp.csv").then(function(data) {
+
+                // Store life expectancy data for all years
+                lifeExpectancyData = data;
+
+                // Set color scale domain dynamically based on life expectancy values
+                colorScale.domain(d3.extent(data, d => +d['Life_expectancy']));
+                
+                // Set bar chart scales domain
+                gdpaScale.domain(d3.extent(data, d => +d['%gdpa']));
+                vaccinationScale.domain(d3.extent(data, d => +d['%vaccinated']));
+
+                // Add year label to the top-left corner
+                const yearLabel = svg.append("text")
+                    .attr("x", 20)
+                    .attr("y", 40)
+                    .attr("font-size", "24px")
+                    .attr("fill", "#333")
+                    .text(currentYear);
+
+                // Draw the globe initially
+                drawGlobe(geojson, currentYear);
+
+                // Start the rotation animation
+                rotateGlobe(geojson, yearLabel);
+
+                // Add heatmap legend
+                addLegend();
+
+                // Enable dragging interaction
+                enableDragging();
+                setupCountryControls(geojson);
+            });
+        });
+
+        // Function to draw the globe based on life expectancy data for the current year
+        function drawGlobe(geojson, year) {
+            // Filter data for the current year
+            const filteredData = lifeExpectancyData.filter(d => +d['Year'] == year);
+
+            // Create a lookup for life expectancy and other data by country code
+            const countryData = {};
+            filteredData.forEach(d => {
+                countryData[d['Code']] = {
+                    lifeExpectancy: +d['Life_expectancy'],
+                    gdpa: +d['%gdpa'],
+                    vaccinated: +d['%vaccinated']
+                };
+            });
+
+            // Clear the previous map and draw new paths
+            svg.selectAll("path").remove();
+            svg.append("g")
+                .selectAll("path")
+                .data(geojson.features)
+                .enter().append("path")
+                .attr("d", path)
+                .attr("fill", d => {
+                    const countryCode = d.id;
+                    const lifeExp = countryData[countryCode]?.lifeExpectancy;
+                    return lifeExp ? colorScale(lifeExp) : "#ccc"; // Default color if no data
+                })
+                .attr("stroke", "#fff")
+                .on("mouseover", function(event, d) {
+                    // Get the life expectancy value for the hovered country
+                    const countryCode = d.id;
+                    const lifeExp = countryData[countryCode]?.lifeExpectancy;
+
+                    if (lifeExp) {
+                        tooltip.style("display", "block")
+                            .html(`<strong>${d.properties.name}</strong><br>Life Expectancy: ${lifeExp}`);
+                    }
+                })
+                .on("mousemove", function(event) {
+                    // Move the tooltip to follow the mouse
+                    tooltip.style("left", (event.pageX + 10) + "px")
+                           .style("top", (event.pageY - 30) + "px");
+                })
+                .on("mouseout", function() {
+                    // Hide the tooltip when the mouse leaves the country
+                    tooltip.style("display", "none");
+                });
+
+            // Add bar charts for %gdpa and %vaccinated on top of each country
+            svg.append("g").selectAll(".bar-chart")
+                .data(geojson.features)
+                .enter().append("g")
+                .attr("class", "bar-chart")
+                .attr("transform", d => {
+                    const centroid = path.centroid(d);
+                    return `translate(${centroid[0]}, ${centroid[1] - 10})`; // Adjust position slightly above the country
+                })
+                .each(function(d) {
+                    const countryCode = d.id;
+                    const gdpa = countryData[countryCode]?.gdpa || 0;
+                    const vaccinated = countryData[countryCode]?.vaccinated || 0;
+
+                    // Draw the GDP bar
+                    d3.select(this).append("rect")
+                        .attr("width", 5)
+                        .attr("height", gdpaScale(gdpa))
+                        .attr("x", -10)
+                        .attr("y", -gdpaScale(gdpa))
+                        .attr("fill", "#1f77b4");
+
+                    // Draw the Vaccination bar
+                    d3.select(this).append("rect")
+                        .attr("width", 5)
+                        .attr("height", vaccinationScale(vaccinated))
+                        .attr("x", 5)
+                        .attr("y", -vaccinationScale(vaccinated))
+                        .attr("fill", "#ff7f0e");
+                });
+        }
+
+        // Function to smoothly rotate the globe and change year after a full rotation
+        function rotateGlobe(geojson, yearLabel) {
+            d3.timer(function() {
+                if (rotating) {
+                    // Update the rotation angle
+                    rotateAngle = (rotateAngle + rotationSpeed) % 360; // Ensure it stays within 0-360 degrees
+                    projection.rotate([rotateAngle, 0]);
+
+                    // Redraw the map with the updated rotation
+                    svg.selectAll("path").attr("d", path);
+
+                    // Detect when a full rotation (360 degrees) is completed
+                    if (Math.abs(rotateAngle) < 0.1) {  // Close to 360 or 0 degrees
+                        currentYear = currentYear < 2020 ? currentYear + 1 : 2000; // Cycle between 2000 and 2020
+                        yearLabel.text(currentYear); // Update year label
+                        drawGlobe(geojson, currentYear); // Redraw the globe with the new year's data
+                    }
+                }
+            });
+        }
+
+        // Function to add a heatmap legend for life expectancy
+        function addLegend() {
+            const legendHeight = 200, legendWidth = 10;
+
+            const legendSvg = svg.append("g")
+                .attr("class", "legend")
+                .attr("transform", `translate(${width - 50}, 100)`);
+
+            const legendScale = d3.scaleLinear()
+                .range([legendHeight, 0])
+                .domain(colorScale.domain());
+
+            const legendAxis = d3.axisRight(legendScale)
+                .tickFormat(d3.format(".0f"))
+                .ticks(6);
+
+            legendSvg.selectAll("rect")
+                .data(d3.range(legendHeight), d => d)
+                .enter().append("rect")
+                .attr("x", 0)
+                .attr("y", d => legendHeight - d - 1)
+                .attr("width", legendWidth)
+                .attr("height", 1)
+                .attr("fill", d => colorScale(legendScale.invert(d)));
+
+            legendSvg.append("g")
+                .attr("transform", `translate(${legendWidth}, 0)`)
+                .call(legendAxis);
+        }
+
+        // Function to enable dragging interaction for the globe
+        function enableDragging() {
+            let previousAngle = 0;
+
+            svg.call(d3.drag()
+                .on("start", function(event) {
+                    dragging = true;
+                    rotating = false; // Stop the auto-rotation during dragging
+                    previousAngle = event.x;
+                })
+                .on("drag", function(event) {
+                    const angleDelta = event.x - previousAngle;
+                    rotateAngle = (rotateAngle + angleDelta * 0.3) % 360; // Update rotation angle
+                    previousAngle = event.x;
+                    projection.rotate([rotateAngle, 0]); // Update projection with new rotation
+                    svg.selectAll("path").attr("d", path); // Redraw the map
+                })
+                .on("end", function() {
+                    dragging = false;
+                    rotating = true; // Resume auto-rotation after dragging
+                })
+            );
+        }
+
+        // Setup the search bar and country list checkboxes
+        function setupCountryControls(geojson) {
+            const searchBar = d3.select("#search-bar");
+            const countryList = d3.select("#country-list");
+            const selectAllCheckbox = d3.select("#select-all");
+
+            // Populate the country list with checkboxes
+            geojson.features.forEach(country => {
+                const countryCode = country.id;
+                const countryName = country.properties.name;
+
+                const div = countryList.append("div").attr("class", "country-checkbox");
+                div.append("input")
+                    .attr("type", "checkbox")
+                    .attr("id", `checkbox-${countryCode}`)
+                    .attr("value", countryCode);
+                div.append("label").attr("for", `checkbox-${countryCode}`).text(countryName);
+            });
+
+            // Filter country list based on search input
+            searchBar.on("input", function() {
+                const query = this.value.toLowerCase();
+                countryList.selectAll(".country-checkbox").style("display", function() {
+                    const countryName = d3.select(this).select("label").text().toLowerCase();
+                    return countryName.includes(query) ? "block" : "none";
+                });
+            });
+
+            // Select or deselect all countries when the "Select All" checkbox is clicked
+            selectAllCheckbox.on("change", function() {
+                const isChecked = this.checked;
+                countryList.selectAll("input[type='checkbox']").property("checked", isChecked);
+            });
+        }
+    </script>
+</body>
+</html>
