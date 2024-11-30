@@ -214,6 +214,11 @@
 
                     // Redraw the map with the updated rotation
                     svg.selectAll("path").attr("d", path);
+                    svg.selectAll(".bar-chart")
+                .attr("transform", d => {
+                    const centroid = path.centroid(d); // Get the updated centroid for the country
+                    return `translate(${centroid[0]}, ${centroid[1] - 10})`; // Reapply the position
+                });
 
                     // Detect when a full rotation (360 degrees) is completed
                     if (Math.abs(rotateAngle) < 0.1) {  // Close to 360 or 0 degrees
@@ -254,6 +259,7 @@
                 .attr("transform", `translate(${legendWidth}, 0)`)
                 .call(legendAxis);
         }
+        
 
         // Function to enable dragging interaction for the globe
         function enableDragging() {
@@ -270,7 +276,12 @@
                     rotateAngle = (rotateAngle + angleDelta * 0.3) % 360; // Update rotation angle
                     previousAngle = event.x;
                     projection.rotate([rotateAngle, 0]); // Update projection with new rotation
-                    svg.selectAll("path").attr("d", path); // Redraw the map
+                    svg.selectAll("path").attr("d", path);
+                    svg.selectAll(".bar-chart")
+            .attr("transform", d => {
+                const centroid = path.centroid(d); // Get the updated centroid for the country
+                return `translate(${centroid[0]}, ${centroid[1] - 10})`; // Reapply the position
+            }); // Redraw the map
                 })
                 .on("end", function() {
                     dragging = false;
