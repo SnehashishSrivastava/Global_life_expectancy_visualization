@@ -82,8 +82,8 @@
         let dragging = false; // Track if the user is dragging
 
         // Color scale for life expectancy (adjust based on data)
-        const colorScale =d3.scaleSequential(d3.interpolateYlGnBu) 
-            .range(["#1f77b4", "#ff7f0e"]);
+        const colorScale =d3.scaleSequential(d3.interpolateRgb.gamma(2.2)("purple", "orange")) 
+            // .range(["#1f77b4", "#ff7f0e"]);
         
         // Scales for GDP and vaccination bar charts
         const gdpaScale = d3.scaleLinear().range([0, 50]); // Max bar height 50 for %gdpa
@@ -154,7 +154,7 @@
                 };
             });
             console.log("Country Data Lookup:", countryData);
-            const lifeExpScale = d3.scaleSequential(d3.interpolateYlGnBu)  // A color scale for life expectancy
+            const lifeExpScale = d3.scaleSequential(d3.interpolateRgb.gamma(2.2)("purple", "orange")) // A color scale for life expectancy
 
 
             // Clear the previous map and draw new paths
