@@ -38,6 +38,100 @@
             align-items: center;
             margin-bottom: 5px;
         }
+        #year-controls {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#year-input {
+    width: 80px;
+    font-size: 16px;
+    padding: 4px;
+    text-align: center;
+}
+
+#play-button {
+    font-size: 16px;
+    padding: 4px 8px;
+}
+.toggle-button {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .circle-icon {
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .flat-icon {
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+    opacity: 0;
+  }
+
+  .toggle-button.active .circle-icon {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+
+  .toggle-button.active .flat-icon {
+    transform: scale(1);
+    opacity: 1;
+  }
+</style>
+
+<svg
+  class="toggle-button"
+  width="80"
+  height="40"
+  viewBox="0 0 80 40"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <!-- Background Circle -->
+  <rect
+    x="0"
+    y="0"
+    width="80"
+    height="40"
+    rx="20"
+    fill="#e3e4e8"
+  ></rect>
+
+  <!-- Globe Icon -->
+  <g
+    class="circle-icon"
+    transform="translate(20, 20) scale(1)"
+    fill="#007bff"
+  >
+    <circle r="8"></circle>
+    <path
+      d="M -5 0 A 5 5 0 0 1 5 0 M 0 -5 A 5 5 0 0 1 0 5"
+      fill="none"
+      stroke="white"
+      stroke-width="1.5"
+    ></path>
+  </g>
+
+  <!-- Map Icon -->
+  <g
+    class="flat-icon"
+    transform="translate(60, 20) scale(0.8)"
+    fill="#28a745"
+  >
+    <rect x="-6" y="-4" width="12" height="8" rx="1"></rect>
+    <line
+      x1="-6"
+      y1="0"
+      x2="6"
+      y2="0"
+      stroke="white"
+      stroke-width="1.5"
+    ></line>
+  </g>
+</svg>
     </style>
 </head>
 <body>
@@ -49,14 +143,21 @@
         <div id="country-list">
             <!-- Dynamic list of countries will be added here -->
         </div>
-        <button id="applyfilters">Apply Filters</button>
+        <!-- <button id="applyfilters">Apply Filters</button> -->
     </div>
 
     <svg id="globe" width="800" height="600"></svg>
+    
+    <div id="year-controls">
+        <input type="number" id="year-input" min="2000" max="2020" value="2000">
+        <button id="play-button">Play</button>
+    </div>
 
     <!-- Tooltip container -->
     <div class="tooltip" id="tooltip" style="display: none;"></div>
-
+    <div id="view-toggle" style="position: absolute; top: 20px; right: 20px;">
+        <button id="toggle-view-button">Switch to Map View</button>
+    </div>
     <script>
         // Set up the SVG and projection
         const width = 800, height = 600;
@@ -66,10 +167,15 @@
 
         const tooltip = d3.select("#tooltip"); // Tooltip element
 
-        const projection = d3.geoOrthographic()
+        const globeprojection = d3.geoOrthographic()
             .scale(300)
-            .translate([width / 2, height / 2]);
-
+            .translate([width / 2, height / 2])
+            .clipAngle(90)
+    .precision(0.6);
+    const mapProjection = d3.geoMercator()
+    .scale(150)
+    .translate([width / 2, height / 2]);
+    let projection=globeprojection;
         const path = d3.geoPath().projection(projection);
 
         // Define global variables for current year and life expectancy data
@@ -79,7 +185,8 @@
         let rotationSpeed = 1.5; // Rotation speed per tick
         let rotateAngle = 0; // Current rotation angle
         let rotating = true; // Variable to track if the globe is rotating
-        let dragging = false; // Track if the user is dragging
+        let dragging = false;
+        let rotate=[0,0]; // Track if the user is dragging
 
         // Color scale for life expectancy (adjust based on data)
         const colorScale =d3.scaleSequential(d3.interpolateRgb.gamma(2.2)("purple", "orange")) 
@@ -110,6 +217,7 @@
                 // Set color scale domain dynamically based on life expectancy values
                 colorScale.domain(d3.extent(data, d => +d['Life_expectancy']));
                 
+                                
                 // Set bar chart scales domain
                 gdpaScale.domain(d3.extent(data, d => +d['%gdpa']));
                 vaccinationScale.domain(d3.extent(data, d => +d['%vaccinated']));
@@ -120,7 +228,7 @@
                     .attr("y", 40)
                     .attr("font-size", "24px")
                     .attr("fill", "#333")
-                    .text(currentYear);
+                    .text();
 
                 // Draw the globe initially
                 drawGlobe(geojson, currentYear ,selectedCountries);
@@ -134,12 +242,18 @@
                 // Enable dragging interaction
                 enableDragging();
                 setupCountryControls(geojson);
+                yearcontron(geojson);
+                svg.on("mouseover", function() {
+    rotating = false; // Stop the auto-rotation on hover
+    // stopAutoRotation();
+});
             });
         });
 
         // Function to draw the globe based on life expectancy data for the current year
         function drawGlobe(geojson, year,selectedCountries) {
             // Filter data for the current year
+            svg.selectAll(".bar-chart").remove();
             const filteredData = lifeExpectancyData.filter(d => +d['Year'] == year  && 
             (selectedCountries.length === 0 || selectedCountries.includes(d.Code))
 );
@@ -173,17 +287,18 @@
                 const brightnessFactor = (lifeExp - 20) / (90 - 20);  // Normalize life expectancy to 0-1 scale
                 const adjustedColor = adjustBrightness(color, 1 + brightnessFactor);  // Apply brightness adjustment
 
-                return adjustedColor;  // Return the adjusted color
+                return color;  // Return the adjusted color
             })          
                 .attr("stroke", "#fff")
                 .on("mouseover", function(event, d) {
             // Get the country code for the hovered country
             const countryCode = d.id;
-            
+            rotating = false;
             // Get the life expectancy, GDP, and vaccination data for the country
             const lifeExp = countryData[countryCode]?.lifeExpectancy;
             const gdpa = countryData[countryCode]?.gdpa;
             const vaccinated = countryData[countryCode]?.vaccinated;
+            // projection.rotating=false;
 
             // Only show the tooltip if any data is available for the country
             if (lifeExp !== undefined || gdpa !== undefined || vaccinated !== undefined) {
@@ -202,11 +317,13 @@
         })
         .on("mousemove", function(event) {
             // Move the tooltip to follow the mouse
+            rotating = false;
             tooltip.style("left", (event.pageX + 10) + "px")
                    .style("top", (event.pageY - 30) + "px");
         })
         .on("mouseout", function() {
             // Hide the tooltip when the mouse leaves the country
+            rotating = true;
             tooltip.style("display", "none");
         });
 
@@ -268,7 +385,8 @@
                     // Detect when a full rotation (360 degrees) is completed
                     if (Math.abs(rotateAngle) < 1.5) {  // Close to 360 or 0 degrees
                         currentYear = currentYear < 2020 ? currentYear + 1 : 2000; // Cycle between 2000 and 2020
-                        yearLabel.text(currentYear); // Update year label
+                        const yearInput = d3.select("#year-input");
+                        yearInput.node().value = currentYear;
                         drawGlobe(geojson, currentYear,selectedCountries); // Redraw the globe with the new year's data
                     }
                 }
@@ -295,7 +413,7 @@
                 .data(d3.range(legendHeight), d => d)
                 .enter().append("rect")
                 .attr("x", 0)
-                .attr("y", d => legendHeight - d - 1)
+                .attr("y", d => legendHeight - d)
                 .attr("width", legendWidth)
                 .attr("height", 1)
                 .attr("fill", d => colorScale(legendScale.invert(d)));
@@ -308,32 +426,43 @@
 
         // Function to enable dragging interaction for the globe
         function enableDragging() {
-            let previousAngle = 0;
+    let rotate = [0, 0]; // Initial rotation [longitude, latitude]
+    let scale = 300; // Adjust this to match your globe's scale
+    let projection = d3.geoOrthographic()
+        .scale(scale)
+        .translate([width / 2, height / 2])
+        .clipAngle(90)
+        .precision(0.6);
 
-            svg.call(d3.drag()
-                .on("start", function(event) {
-                    dragging = true;
-                    rotating = false; // Stop the auto-rotation during dragging
-                    previousAngle = event.x;
-                })
-                .on("drag", function(event) {
-                    const angleDelta = event.x - previousAngle;
-                    rotateAngle = (rotateAngle + angleDelta * 0.3) % 360; // Update rotation angle
-                    previousAngle = event.x;
-                    projection.rotate([rotateAngle, 0]); // Update projection with new rotation
-                    svg.selectAll("path").attr("d", path);
-                    svg.selectAll(".bar-chart")
-            .attr("transform", d => {
-                const centroid = path.centroid(d); // Get the updated centroid for the country
-                return `translate(${centroid[0]}, ${centroid[1] - 5})`; // Reapply the position
-            }); // Redraw the map
-                })
-                .on("end", function() {
-                    dragging = false;
-                    rotating = true; // Resume auto-rotation after dragging
-                })
-            );
-        }
+    let path = d3.geoPath().projection(projection);
+
+    svg.call(d3.drag()
+        .subject(() => {
+            const r = projection.rotate();
+            return { x: r[0] / scale, y: -r[1] / scale }; // Map rotation to dragging position
+        })
+        .on("drag", (event) => {
+            const dx = event.dx;
+            const dy = event.dy;
+
+            rotate[0] = rotate[0] + dx * 0.5; // Update longitude (X-axis)
+            rotate[1] = rotate[1] - dy * 0.5; // Update latitude (Y-axis)
+
+            rotate[1] = Math.max(-90, Math.min(90, rotate[1])); // Clamp latitude to [-90, 90]
+
+            projection.rotate(rotate);
+            svg.selectAll("path").attr("d", path);
+
+            // Update positions of bar charts or markers if present
+            svg.selectAll(".bar-chart")
+                .attr("transform", d => {
+                    const centroid = path.centroid(d);
+                    return `translate(${centroid[0]}, ${centroid[1] - 5})`;
+                });
+        })
+    );
+}
+
 
         // Setup the search bar and country list checkboxes
         function setupCountryControls(geojson) {
@@ -353,9 +482,13 @@
                     .attr("value", countryCode)
                     .on("change", function() {
                 if (this.checked) {
-                    selectedCountries.push(countryCode); // Add country to the selection
+                    selectedCountries.push(countryCode);
+                    drawGlobe(geojson, currentYear,selectedCountries);
+                     // Add country to the selection
                 } else {
-                    selectedCountries = selectedCountries.filter(c => c !== countryCode); // Remove from the selection
+                    selectedCountries = selectedCountries.filter(c => c !== countryCode);
+                    drawGlobe(geojson, currentYear,selectedCountries);
+                     // Remove from the selection
                 }
             });
                 div.append("label").attr("for", `checkbox-${countryCode}`).text(countryName);
@@ -372,23 +505,34 @@
 
             // Select or deselect all countries when the "Select All" checkbox is clicked
             
-            selectAllCheckbox.on("change", function() {
+            selectAllCheckbox.on("click", function() {
         const isChecked = this.checked;
-        selectedCountries = []; // Clear the array first
+        selectedCountries = isChecked ? geojson.features.map(country => country.id) : []; // Clear the array and add all country codes if checked
 
-        countryList.selectAll("input[type='checkbox']").each(function() {
-            this.checked = isChecked; // Set all checkboxes to match "Select All"
-            if (isChecked) {
-                selectedCountries.push(this.value); // Add all countries if checked
-            }
-        });
-    });
-            document.getElementById("applyfilters").addEventListener("click", function() {
-    // Redraw the globe with the selected countries
-    svg.selectAll(".bar-chart").remove();
-    drawGlobe(geojson, currentYear, selectedCountries);
-});
-        }
+        // Set the checkboxes state based on "Select All"
+        countryList.selectAll("input[type='checkbox']")
+            .property("checked", isChecked); // Set all checkboxes to match the "Select All" checkbox state
+    }); }
+    function yearcontron(geojson){
+            const yearInput = d3.select("#year-input");
+                const playButton = d3.select("#play-button");
+
+                yearInput.on("change", function () {
+                    const enteredYear = +this.value;
+                    if (enteredYear >= 2000 && enteredYear <= 2020) {
+                        currentYear = enteredYear;
+                        rotating = false; // Stop rotation
+                        drawGlobe(geojson, currentYear, selectedCountries);
+                    } else {
+                        alert("Please enter a year between 2000 and 2020.");
+                        this.value = currentYear; // Reset input to the current year
+                    }
+                });
+                playButton.on("click", function () {
+                    rotating = true; // Resume rotation
+                    rotateGlobe(geojson, yearInput.node()); // Pass the updated input element
+                });
+            };
     </script>
 </body>
 </html>
