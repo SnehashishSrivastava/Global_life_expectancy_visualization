@@ -9,10 +9,10 @@
         /* Style for the tooltip */
         .tooltip {
             position: absolute;
-            background-color: white;
-            border: 1px solid #ccc;
-            padding: 8px;
-            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.887);
+            border: 1px solid #47204d;
+            padding: 15px;
+            border-radius: 14px;
             font-size: 14px;
             pointer-events: none;
             box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
@@ -25,13 +25,15 @@
         #search-bar {
             margin-bottom: 10px;
             width: 100%;
+            border-radius: 10px;
         }
         #country-list {
             max-height: 300px;
             overflow-y: auto;
-            border: 1px solid #ccc;
+            border: 1px solid #171616c9;
             padding: 5px;
             margin-bottom: 10px;
+            border-radius: 10px;
         }
         .country-checkbox {
             display: flex;
@@ -52,11 +54,55 @@
     font-size: 16px;
     padding: 4px;
     text-align: center;
+    border-radius: 10px;
 }
 
 #play-button {
     font-size: 16px;
     padding: 4px 8px;
+}
+#year-slider {
+    -webkit-appearance: none; /* For Chrome and Safari */
+    appearance: none; /* Default */
+    height: 8px;
+    border-radius: 10px;
+    background: linear-gradient(to right, #2196F3, #ff5722);
+    outline: none;
+    cursor: pointer;
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.2);
+    transition: background 0.3s;
+}
+
+#year-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #FFFFFF;
+    border: 2px solid #2196F3;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5);
+}
+
+#year-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #FFFFFF;
+    border: 2px solid #2196F3;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5);
+}
+
+#year-slider::-ms-thumb {
+    width: 20px;
+    height: 20px;
+    background: #FFFFFF;
+    border: 2px solid #2196F3;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5);
 }
 
 </style>
@@ -134,7 +180,7 @@
     <!-- Tooltip container -->
     <div class="tooltip" id="tooltip" style="display: none;"></div>
     <div id="view-toggle" style="position: absolute; top: 20px; right: 20px;">
-        <button id="toggle-view-button">Switch to Map View</button>
+        <!-- <button id="toggle-view-button">Switch to Map View</button> -->
     </div>
     <script>
         // Set up the SVG and projection
@@ -167,7 +213,7 @@
         let rotate=[0,0]; // Track if the user is dragging
 
         // Color scale for life expectancy (adjust based on data)
-        const colorScale =d3.scaleSequential(d3.interpolateRgb.gamma(2.2)("purple", "orange")) 
+        let colorScale =d3.scaleSequential(d3.interpolatePurples) 
             // .range(["#1f77b4", "#ff7f0e"]);
         
         // Scales for GDP and vaccination bar charts
@@ -226,11 +272,29 @@
    
                 rotating = false;
             });
-        svg.on("mouseout", function() {
+            svg.on("mouseout", function() {
             // Hide the tooltip when the mouse leaves the country
             rotating = true;
             // tooltip.style("display", "none");
         });
+             const graticule = d3.geoGraticule()
+              .step([10, 10]);
+        svg.append("path")
+        .datum(graticule)
+        .attr("class", "graticule")
+        .attr("d", path)
+        .attr("fill", "none")
+        .attr("stroke", "#ccc") // Light gray grid lines
+        .attr("stroke-width", 0.5);
+
+// Optionally add a grid for the equator
+        // svg.append("path")
+        //     .datum(graticule.outline()) // Optional globe outline
+        //     .attr("class", "graticule-outline")
+        //     .attr("d", path)
+        //     .attr("fill", "none")
+        //     .attr("stroke", "#666") // Darker stroke for the outline
+        //     .attr("stroke-width", 1);
 
             });
         });
@@ -264,6 +328,7 @@
         // Function to draw the globe based on life expectancy data for the current year
         function drawGlobe(geojson, year,selectedCountries) {
             // Filter data for the current year
+       
             svg.selectAll(".bar-chart").remove();
             const filteredData = lifeExpectancyData.filter(d => +d['Year'] == year  && 
             (selectedCountries.length === 0 || selectedCountries.includes(d.Code))
@@ -275,11 +340,12 @@
                 countryData[d['Code']] = {
                     lifeExpectancy: +d['Life_expectancy'],
                     gdpa: +d['%gdpa'],
-                    vaccinated: +d['%vaccinated']
+                    vaccinated: +d['%vaccinated'],
+                    growth: d['growth'] 
                 };
             });
             console.log("Country Data Lookup:", countryData);
-            const lifeExpScale = d3.scaleSequential(d3.interpolateRgb.gamma(2.2)("purple", "orange")) // A color scale for life expectancy
+            // const lifeExpScale = d3.scaleSequential(d3.interpolateRgb.gamma(1.2)("orange","green")) // A color scale for life expectancy
 
 
             // Clear the previous map and draw new paths
@@ -301,8 +367,39 @@
                 return color;  // Return the adjusted color
             })          
                 .attr("stroke", "#fff")
+                .each(function(d) {
+                    const countryCode = d.id;
+                    console.log("Country Code:", countryCode, "GDP:", countryData[countryCode]?.gdpa|| 0, "Vaccinated:", countryData[countryCode]?.vaccinated|| 0);
+                    const gdpa = countryData[countryCode]?.gdpa || 0;
+                    const vaccinated = countryData[countryCode]?.vaccinated || 0;
+                    const gdpaHeight = Math.max(0, gdpaScale(gdpa));  // Ensure non-negative height
+                    const vaccinatedHeight = Math.max(0, vaccinationScale(vaccinated));
+                    const growth=countryData[countryCode]?.growth
+                    // Draw the GDP b
+            console.log(growth);
+        if (growth === "False") {
+            // Apply blinking animation for countries where growth is false
+            d3.select(this)
+                .transition()
+                .duration(500) // Duration of fade-out
+                .style("opacity", 0.2)
+                .transition()
+                .duration(500) // Duration of fade-in
+                .style("opacity", 1)
+                .on("end", function repeat() {
+                        d3.select(this)
+                            .transition()
+                            .duration(200)
+                            .style("opacity", 0.1)
+                            .transition()
+                            .duration(200)
+                            .style("opacity", 1)
+                            .on("end", repeat);
+                    });}})
+                
                 .on("mouseover", function(event, d) {
             // Get the country code for the hovered country
+                
             const countryCode = d.id;
             rotating = false;
             // Get the life expectancy, GDP, and vaccination data for the country
@@ -339,6 +436,9 @@
         });
 
             console.log("selectedCountries", selectedCountries);
+            // svg.append("g").selectAll("path")
+            // .data(geojson.features.filter(d => selectedCountries.length==0 || selectedCountries.includes(d.id)))
+            // .enter().append("g")
             // Add bar charts for %gdpa and %vaccinated on top of each country
             svg.append("g").selectAll(".bar-chart")
             .data(geojson.features.filter(d => selectedCountries.length==0 || selectedCountries.includes(d.id)))
@@ -355,8 +455,30 @@
                     const vaccinated = countryData[countryCode]?.vaccinated || 0;
                     const gdpaHeight = Math.max(0, gdpaScale(gdpa));  // Ensure non-negative height
                     const vaccinatedHeight = Math.max(0, vaccinationScale(vaccinated));
+                    const growth=countryData[countryCode]?.growth
                     // Draw the GDP bar
-                    if (gdpa > 0) {
+        // if (growth === false) {
+        //     // Apply blinking animation for countries where growth is false
+        //     d3.select(this)
+        //         .transition()
+        //         .duration(500) // Duration of fade-out
+        //         .style("opacity", 0.2)
+        //         .transition()
+        //         .duration(500) // Duration of fade-in
+        //         .style("opacity", 1)
+        //         .on("end", function repeat() {
+        //                 d3.select(this)
+        //                     .transition()
+        //                     .duration(500)
+        //                     .style("opacity", 0.2)
+        //                     .transition()
+        //                     .duration(500)
+        //                     .style("opacity", 1)
+        //                     .on("end", repeat);
+        //             }); // Repeat the blinking effect indefinitely
+        // }
+    
+        if (gdpa > 0) {
             d3.select(this).append("rect")
                 .attr("width", 5)
                 .attr("height", gdpaHeight)
@@ -374,8 +496,9 @@
                 .attr("y", -vaccinatedHeight)
                 .attr("fill", "#ff7f0e");
         }
-    });
-        }
+
+        })
+    }
 
         // Function to smoothly rotate the globe and change year after a full rotation
         function rotateGlobe(geojson, yearLabel) {
@@ -405,34 +528,97 @@
         }
 
         // Function to add a heatmap legend for life expectancy
+        // function addLegend() {
+        //     const legendWidth = 200, legendHeight = 10;
+
+        //     const legendSvg = svg.append("g")
+        //         .attr("class", "legend")
+        //         .attr("transform", `translate(${width - 50}, 100)`);
+
+        //     const legendScale = d3.scaleLinear()
+        //         .range([0,legendWidth])
+        //         .domain(colorScale.domain());
+            
+
+        //     const legendAxis = d3.axisRight(legendScale)
+        //         .tickFormat(d3.format(".0f"))
+        //         .ticks(6);
+        //     // const gradientData = d3.range(legendHeight);
+
+        //     legendSvg.selectAll("rect")
+        //         .data(d3.range(d3.range(legendHeight)))
+        //         .enter().append("rect")
+        //         .attr("x", 0)
+        //         .attr("y", d => legendHeight- d)
+        //         .attr("width", legendWidth)
+        //         .attr("height", 1)
+        //         .attr("fill", d => colorScale(legendScale.invert(d)));
+
+        //     legendSvg.append("g")
+        //         .attr("transform", `translate(${legendWidth}, 0)`)
+        //         .call(legendAxis);
+        // }
         function addLegend() {
-            const legendHeight = 200, legendWidth = 10;
+    const legendWidth = 200, legendHeight = 10;
 
-            const legendSvg = svg.append("g")
-                .attr("class", "legend")
-                .attr("transform", `translate(${width - 50}, 100)`);
+    // Create the defs for the gradient
+    const defs = svg.append("defs");
 
-            const legendScale = d3.scaleLinear()
-                .range([legendHeight, 0])
-                .domain(colorScale.domain());
+    const gradient = defs.append("linearGradient")
+        .attr("id", "legend-gradient")
+        .attr("x1", "0%")
+        .attr("y1", "0%")
+        .attr("x2", "100%")
+        .attr("y2", "0%");
 
-            const legendAxis = d3.axisRight(legendScale)
-                .tickFormat(d3.format(".0f"))
-                .ticks(6);
+    // Define stops for the gradient
+    const numStops = 10;
+    const colorDomain = colorScale.domain();
+    const rangeStep = (colorDomain[1] - colorDomain[0]) / (numStops - 1);
 
-            legendSvg.selectAll("rect")
-                .data(d3.range(legendHeight), d => d)
-                .enter().append("rect")
-                .attr("x", 0)
-                .attr("y", d => legendHeight - d)
-                .attr("width", legendWidth)
-                .attr("height", 1)
-                .attr("fill", d => colorScale(legendScale.invert(d)));
+    for (let i = 0; i < numStops; i++) {
+        gradient.append("stop")
+            .attr("offset", `${(i / (numStops - 1)) * 100}%`)
+            .attr("stop-color", colorScale(colorDomain[0] + i * rangeStep));
+    }
 
-            legendSvg.append("g")
-                .attr("transform", `translate(${legendWidth}, 0)`)
-                .call(legendAxis);
-        }
+    // Append the legend group
+    const legendSvg = svg.append("g")
+        .attr("class", "legend")
+        .attr("transform", `translate(${width - legendWidth - 50}, 100)`);
+
+    // Draw the rectangle filled with the gradient
+    legendSvg.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", legendWidth)
+        .attr("height", legendHeight)
+        .style("fill", "url(#legend-gradient)");
+
+    // Add a title to the legend
+    legendSvg.append("text")
+        .attr("class", "legend-title")
+        .attr("x", legendWidth / 2)
+        .attr("y", -10)
+        .style("text-anchor", "middle")
+        .text("Legend Title");
+
+    // Set up the scale for the axis
+    const legendScale = d3.scaleLinear()
+        .range([0, legendWidth])
+        .domain(colorDomain);
+
+    // Define and append the axis
+    const legendAxis = d3.axisBottom(legendScale)
+        .tickFormat(d3.format(".0f"))
+        .ticks(6);
+
+    legendSvg.append("g")
+        .attr("class", "legend-axis")
+        .attr("transform", `translate(0, ${legendHeight})`)
+        .call(legendAxis);
+}
+
         
 
         // Function to enable dragging interaction for the globe

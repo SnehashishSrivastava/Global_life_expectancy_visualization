@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Expectancy Map</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Style for the tooltip */
+        .tooltip {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.887);
+            border: 1px solid #47204d;
+            padding: 15px;
+            border-radius: 14px;
+            font-size: 14px;
+            pointer-events: none;
+            box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+        }
+        #controls {
+            float: right;
+            width: 200px;
+            margin-right: 20px;
+        }
+        #search-bar {
+            margin-bottom: 10px;
+            width: 100%;
+            border-radius: 10px;
+        }
+        #country-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #171616c9;
+            padding: 5px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+        }
+        .country-checkbox {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        #year-controls {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#year-input {
+    width: 80px;
+    font-size: 16px;
+    padding: 4px;
+    text-align: center;
+    border-radius: 10px;
+}
+
+#play-button {
+    font-size: 16px;
+    #slider-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+    width: 80%;
+    margin-left: 10%;
+}
+
+/* #year-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 12px;
+    background: transparent;
+    border: 2px solid #007bff;
+    border-radius: 6px;
+    outline: none;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    cursor: pointer;
+}
+
+#year-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 16px;
+    background: #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.4);
+}
+
+#year-slider::-moz-range-thumb {
+    width: 100%;
+    height: 16px;
+    background: #007bff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.4);
+}
+
+#slider-value {
+    font-size: 16px;
+    color: #007bff;
+    margin-top: 5px;
+} */
+
+
+
+</style>
+</head>
+<body>
+    
+    
+    
+    <div id="controls">
+        <input type="text" id="search-bar" placeholder="Search for a country...">
+        <div>
+            <input type="checkbox" id="select-all"> Select All
+        </div>
+        <div id="country-list">
+            <!-- Dynamic list of countries will be added here -->
+        </div>
+        <!-- <button id="applyfilters">Apply Filters</button> -->
+    </div>
+    <svg id="map" width = "960" height = "600"></svg>
+  
+    <div id="year-controls">
+        <input type="number" id="year-input" min="2000" max="2020" value="2000">
+        <button id="play-button">Play</button>
+    </div>
+    <div class="tooltip" id="tooltip" style="display: none;"></div>
+    <script>
+const width = 960, height = 600;
+let lifeExpectancyData;
+
+
+// Create an SVG container
+const svg = d3.select("#map")
+    .attr("width", width)
+    .attr("height", height);
+const tooltip = d3.select("#tooltip");
+let rotating = true;
+let duration=10000;
+let changing=true;
+// Define a projection and path
+const mapprojection = d3.geoMercator()
+    .scale(150)
+    .translate([width / 2, height / 1.5]);
+const path = d3.geoPath().projection(mapprojection);
+let currentYear = 2000;
+    // let lifeExpectancyData;
+    let selectedCountries = [];
+
+// Load GeoJSON from GitHub and CSV data
+
+    d3.json("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson").then(function(geojson) { // GeoJSON from GitHub
+    d3.csv("lifeexp.csv").then(function(data) {
+    // Filter data for a specific year (e.g., 2008)
+    // const currentYear = "2008";
+     lifeExpectancyData = data;
+    // let selectedCountries = [];
+    // Map country codes to life expectancy
+    const lifeExpMap = new Map(lifeExpectancyData.map(d => [d.Code, +d.Life_expectancy]));
+    
+    // Define a color scale
+    const colorScale = d3.scaleSequential(d3.interpolateBlues)
+        .domain(d3.extent(lifeExpectancyData, d => +d.Life_expectancy));
+
+    // Add a legend
+    drawmap(geojson, currentYear, selectedCountries);
+    // console.log(geojson);
+    setupCountryControls(geojson);
+
+// Initialize controls and automatic updates
+yearcontrol(geojson);
+incrementYearAndDrawMap(geojson);
+    const legend = svg.append("g")
+        .attr("transform", `translate(${width - 50}, 100)`);
+
+    const legendScale = d3.scaleLinear()
+        .domain(colorScale.domain())
+        .range([0, 100]);
+
+    legend.selectAll("rect")
+        .data(d3.range(0, 1.01, 0.1))
+        .enter().append("rect")
+        .attr("x", (d, i) => i * 10)
+        .attr("width", 10)
+        .attr("height", 10)
+        .attr("fill", d => colorScale(d * (colorScale.domain()[1] - colorScale.domain()[0]) + colorScale.domain()[0]));
+
+    legend.append("text")
+        .attr("x", 0)
+        .attr("y", 25)
+        .text(colorScale.domain()[0]);
+
+    legend.append("text")
+        .attr("x", 100)
+        .attr("y", 25)
+        .attr("text-anchor", "end")
+        .text(colorScale.domain()[1]);
+    // drawmap(geojson,currentYear,selectedCountries)
+})
+    })
+    function drawmap(geojson,year,selectedCountries){
+        // console.log(d);
+        // const lifeExpMap = new Map(lifeExpectancyData.map(d => [d.Code, +d.Life_expectancy]));
+        const filteredData = lifeExpectancyData.filter(d => +d['Year'] == year  && 
+            (selectedCountries.length === 0 || selectedCountries.includes(d.Code)));
+            const countryData = {};
+            filteredData.forEach(d => {
+                countryData[d['Code']] = {
+                    lifeExpectancy: +d['Life_expectancy'],
+                    gdpa: +d['%gdpa'],
+                    vaccinated: +d['%vaccinated']
+                };
+            });
+            console.log("Country Data Lookup:", countryData);
+            // const lifeExpScale = d3.scaleSequential(d3.interpolateRgb.gamma(1.2)("orange","green")) // A color scale for life expectancy
+            let colorScale =d3.scaleSequential(d3.interpolateRgb.gamma(1.2)( "red","green"))
+        .domain(d3.extent(lifeExpectancyData, d => +d.Life_expectancy));
+
+            // Clear the previous map and draw new paths
+            // svg.selectAll("path").remove();
+            svg.append("g")
+                .selectAll("path")
+                .data(geojson.features)
+                .enter().append("path")
+                .attr("d", path)
+                .attr("fill", d => {
+                    const countryCode = d.properties.ISO_A3;
+                    const lifeExp = countryData[countryCode]?.lifeExpectancy;
+                    // let color = colorScale(lifeExp);
+                return  lifeExp ? colorScale(lifeExp) : "#ccc";;  // Return the adjusted color
+            })   
+            .attr("stroke", "#fff")
+                .on("mouseover", function(event, d) {
+            // Get the country code for the hovered country
+            changing=false;
+            const countryCode = d.properties.ISO_A3;
+            // rotating = false;
+            // Get the life expectancy, GDP, and vaccinatio200n data for the country
+            const lifeExp = countryData[countryCode]?.lifeExpectancy;
+            const gdpa = countryData[countryCode]?.gdpa;
+            const vaccinated = countryData[countryCode]?.vaccinated;
+
+            // projection.rotating=false;
+
+            // Only show the tooltip if any data is available for the country
+            if (lifeExp !== undefined || gdpa !== undefined || vaccinated !== undefined) {
+                // Construct the tooltip content
+                // console.log(d.properties);
+                let tooltipContent = `<strong>${d.properties.ADMIN}</strong><br>`;
+                tooltipContent += `Life Expectancy: ${lifeExp}<br>`;
+                tooltipContent += `Vaccinated: ${vaccinated}%`;
+                tooltipContent += `GDP: ${gdpa}%<br>`;
+                
+        
+
+                // Display the tooltip with the data
+                tooltip.style("display", "block")
+                    .html(tooltipContent);
+            }
+        })
+        .on("mousemove", function(event) {
+            // Move the tooltip to follow the mouse
+            changing = false;
+            tooltip.style("left", (event.pageX + 10) + "px")
+                   .style("top", (event.pageY - 30) + "px");
+        })
+        .on("mouseout", function() {
+            // Hide the tooltip when the mouse leaves the country
+            changing = true;
+            tooltip.style("display", "none");
+        });
+    
+
+        
+    }
+    function incrementYearAndDrawMap(geojson) {
+    // Define the current year globally within the function
+    // let currentYear = 2000; 
+
+    // The function that updates the year and redraws the map
+    function update() {
+    if (changing) {
+        // console.log(`Current Year: ${currentYear}`);
+
+        // Increment the year, reset to 2000 if it exceeds 2020
+        currentYear = currentYear < 2020 ? currentYear + 1 : 2000;
+
+        // Update the year input field
+        const yearInput = d3.select("#year-input");
+        if (yearInput.node()) {
+            yearInput.node().value = currentYear;
+        }
+
+        // Redraw the map with the updated year
+        drawmap(geojson, currentYear, selectedCountries);
+
+        // Schedule the next update
+        setTimeout(update, duration);
+    }
+}
+update();
+}
+function yearcontrol(geojson){
+            const yearInput = d3.select("#year-input");
+                const playButton = d3.select("#play-button");
+
+                yearInput.on("change", function () {
+                    const enteredYear = +this.value;
+                    if (enteredYear >= 2000 && enteredYear <= 2020) {
+                        currentYear = enteredYear;
+                        changing = false; // Stop rotation
+                        drawmap(geojson, currentYear, selectedCountries);
+                    } else {
+                        alert("Please enter a year between 2000 and 2020.");
+                        this.value = currentYear; // Reset input to the current year
+                    }
+                });
+        playButton.on("click", function () {
+        changing = !changing; // Toggle automatic updates
+        if (changing) {
+            playButton.text("Pause");
+            incrementYearAndDrawMap(geojson);
+        } else {
+            playButton.text("Play");
+        } // Pass the updated input element
+                });
+            };
+    function setupCountryControls(geojson) {
+            const searchBar = d3.select("#search-bar");
+            const countryList = d3.select("#country-list");
+            const selectAllCheckbox = d3.select("#select-all");
+            // console.log("country-control",geojson.features.id);
+            // Populate the country list with checkboxes
+            geojson.features.forEach(country => {
+                const countryCode = country.properties.ISO_A3;
+                const countryName = country.properties.ADMIN;
+                // console.log(countryName);
+
+
+                const div = countryList.append("div").attr("class", "country-checkbox");
+                div.append("input")
+                    .attr("type", "checkbox")
+                    .attr("id", `checkbox-${countryCode}`)
+                    .attr("value", countryCode)
+                    .on("change", function() {
+                if (this.checked) {
+                    selectedCountries.push(countryCode);
+                    // console.log(countryCode);
+                    drawmap(geojson, currentYear,selectedCountries);
+                     // Add country to the selection
+                } else {
+                    selectedCountries = selectedCountries.filter(c => c !== countryCode);
+                    drawmap(geojson, currentYear,selectedCountries);
+                     // Remove from the selection
+                }
+            });
+                div.append("label").attr("for", `checkbox-${countryCode}`).text(countryName);
+            });
+
+            // Filter country list based on search input
+            searchBar.on("input", function() {
+                const query = this.value.toLowerCase();
+                countryList.selectAll(".country-checkbox").style("display", function() {
+                    const countryName = d3.select(this).select("label").text().toLowerCase();
+                    return countryName.includes(query) ? "block" : "none";
+                });
+            });
+
+            // Select or deselect all countries when the "Select All" checkbox is clicked
+            
+            selectAllCheckbox.on("click", function() {
+        const isChecked = this.checked;
+        selectedCountries = isChecked ? geojson.features.map(country => country.id) : []; // Clear the array and add all country codes if checked
+
+        // Set the checkboxes state based on "Select All"
+        countryList.selectAll("input[type='checkbox']")
+            .property("checked", isChecked); // Set all checkboxes to match the "Select All" checkbox state
+    }); }
+    </script>
+</body>
+</html>
