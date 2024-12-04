@@ -58,29 +58,7 @@
     font-size: 16px;
     padding: 4px 8px;
 }
-.toggle-button {
-    cursor: pointer;
-    user-select: none;
-  }
 
-  .circle-icon {
-    transition: transform 0.3s ease-in-out;
-  }
-
-  .flat-icon {
-    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
-    opacity: 0;
-  }
-
-  .toggle-button.active .circle-icon {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-
-  .toggle-button.active .flat-icon {
-    transform: scale(1);
-    opacity: 1;
-  }
 </style>
 
 <svg
@@ -242,13 +220,46 @@
                 // Enable dragging interaction
                 enableDragging();
                 setupCountryControls(geojson);
-                yearcontron(geojson);
+                yearcontrol(geojson);
+                
                 svg.on("mouseover", function() {
-    rotating = false; // Stop the auto-rotation on hover
-    // stopAutoRotation();
-});
+   
+                rotating = false;
+            });
+        svg.on("mouseout", function() {
+            // Hide the tooltip when the mouse leaves the country
+            rotating = true;
+            // tooltip.style("display", "none");
+        });
+
             });
         });
+//         function zoomed({transform}) {
+//     const zx = transform.rescaleX(x).interpolate(d3.interpolateRound);
+//     const zy = transform.rescaleY(y).interpolate(d3.interpolateRound);
+//     gDot.attr("transform", transform).attr("stroke-width", 5 / transform.k);
+//     gx.call(xAxis, zx);
+//     gy.call(yAxis, zy);
+//     gGrid.call(grid, zx, zy);
+//         }
+
+//   return Object.assign(svg.node(), {
+//     reset() {
+//       svg.transition()
+//           .duration(750)
+//           .call(zoom.transform, d3.zoomIdentity);
+//     }
+//   });
+//         let focus = [width / 2, height / 2];
+// const strength = 0.5; // Fisheye strength
+// const radius = 150;   // Radius of the fisheye effect
+// function redraw() {
+//     const distortedProjection = fisheyeProjection(projection, focus, strength, radius);
+//     const distortedPath = d3.geoPath().projection(distortedProjection);
+
+//     svg.selectAll("path")
+//         .attr("d", distortedPath);
+// }
 
         // Function to draw the globe based on life expectancy data for the current year
         function drawGlobe(geojson, year,selectedCountries) {
@@ -513,7 +524,7 @@
         countryList.selectAll("input[type='checkbox']")
             .property("checked", isChecked); // Set all checkboxes to match the "Select All" checkbox state
     }); }
-    function yearcontron(geojson){
+    function yearcontrol(geojson){
             const yearInput = d3.select("#year-input");
                 const playButton = d3.select("#play-button");
 
@@ -533,6 +544,48 @@
                     rotateGlobe(geojson, yearInput.node()); // Pass the updated input element
                 });
             };
+function fisheyeProjection(baseProjection, focus, strength, radius) {
+    return {
+        stream: function (stream) {
+            const baseStream = baseProjection.stream(stream);
+            return {
+                point: function (x, y) {
+                    const dx = x - focus[0];
+                    const dy = y - focus[1];
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < radius) {
+                        const scale = 1 + strength * (1 - distance / radius);
+                        const distortedX = focus[0] + dx * scale;
+                        const distortedY = focus[1] + dy * scale;
+                        baseStream.point(distortedX, distortedY);
+                    } else {
+                        baseStream.point(x, y);
+                    }
+                },
+                sphere: baseStream.sphere,
+                lineStart: baseStream.lineStart,
+                lineEnd: baseStream.lineEnd,
+                polygonStart: baseStream.polygonStart,
+                polygonEnd: baseStream.polygonEnd,
+            };
+        },
+    };
+}
+function fisheyeDistortion(x, y, focusX, focusY, strength, radius) {
+    const dx = x - focusX;
+    const dy = y - focusY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance < radius) {
+        const distortion = (1 - distance / radius) * strength;
+        return [
+            focusX + dx * (1 + distortion),
+            focusY + dy * (1 + distortion),
+        ];
+    }
+    return [x, y];
+}
     </script>
 </body>
 </html>
