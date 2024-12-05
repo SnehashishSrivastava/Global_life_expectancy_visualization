@@ -10,7 +10,7 @@
         .tooltip {
             position: absolute;
             background-color: rgba(255, 255, 255, 0.887);
-            border: 1px solid #47204d;
+            border: 1px solid #a1d99b;
             padding: 15px;
             border-radius: 14px;
             font-size: 14px;
@@ -59,62 +59,13 @@
 
 #play-button {
     font-size: 16px;
-    #slider-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 20px;
-    width: 80%;
-    margin-left: 10%;
+    padding: 4px 8px;
 }
-
-/* #year-slider {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 12px;
-    background: transparent;
-    border: 2px solid #007bff;
-    border-radius: 6px;
-    outline: none;
-    margin-top: 10px;
-    margin-bottom: 5px;
-    cursor: pointer;
-}
-
-#year-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 16px;
-    background: #007bff;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.4);
-}
-
-#year-slider::-moz-range-thumb {
-    width: 100%;
-    height: 16px;
-    background: #007bff;
-    border-radius: 50%;
-    cursor: pointer;
-    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.4);
-}
-
-#slider-value {
-    font-size: 16px;
-    color: #007bff;
-    margin-top: 5px;
-} */
-
-
 
 </style>
 </head>
 <body>
-    
-    
-    
+
     <div id="controls">
         <input type="text" id="search-bar" placeholder="Search for a country...">
         <div>
@@ -126,7 +77,6 @@
         <!-- <button id="applyfilters">Apply Filters</button> -->
     </div>
     <svg id="map" width = "960" height = "600"></svg>
-  
     <div id="year-controls">
         <input type="number" id="year-input" min="2000" max="2020" value="2000">
         <button id="play-button">Play</button>
@@ -142,9 +92,9 @@ const svg = d3.select("#map")
     .attr("width", width)
     .attr("height", height);
 const tooltip = d3.select("#tooltip");
-let rotating = true;
+// let rotating = true;
 let duration=10000;
-let changing=true;
+let rotating=true;
 // Define a projection and path
 const mapprojection = d3.geoMercator()
     .scale(150)
@@ -153,12 +103,13 @@ const path = d3.geoPath().projection(mapprojection);
 let currentYear = 2000;
     // let lifeExpectancyData;
     let selectedCountries = [];
-
+    const colorScale = d3.scaleSequential(d3.interpolateGreens)
 // Load GeoJSON from GitHub and CSV data
 
     d3.json("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson").then(function(geojson) { // GeoJSON from GitHub
     d3.csv("lifeexp.csv").then(function(data) {
     // Filter data for a specific year (e.g., 2008)
+
     // const currentYear = "2008";
      lifeExpectancyData = data;
     // let selectedCountries = [];
@@ -166,7 +117,7 @@ let currentYear = 2000;
     const lifeExpMap = new Map(lifeExpectancyData.map(d => [d.Code, +d.Life_expectancy]));
     
     // Define a color scale
-    const colorScale = d3.scaleSequential(d3.interpolateBlues)
+     colorScale
         .domain(d3.extent(lifeExpectancyData, d => +d.Life_expectancy));
 
     // Add a legend
@@ -220,11 +171,11 @@ incrementYearAndDrawMap(geojson);
             });
             console.log("Country Data Lookup:", countryData);
             // const lifeExpScale = d3.scaleSequential(d3.interpolateRgb.gamma(1.2)("orange","green")) // A color scale for life expectancy
-            let colorScale =d3.scaleSequential(d3.interpolateRgb.gamma(1.2)( "red","green"))
-        .domain(d3.extent(lifeExpectancyData, d => +d.Life_expectancy));
+        //     let colorScale =d3.scaleSequential(d3.interpolateRgb.gamma(1.2)( "red","green"))
+        // .domain(d3.extent(lifeExpectancyData, d => +d.Life_expectancy));
 
             // Clear the previous map and draw new paths
-            // svg.selectAll("path").remove();
+            svg.selectAll("path").remove();
             svg.append("g")
                 .selectAll("path")
                 .data(geojson.features)
@@ -239,7 +190,7 @@ incrementYearAndDrawMap(geojson);
             .attr("stroke", "#fff")
                 .on("mouseover", function(event, d) {
             // Get the country code for the hovered country
-            changing=false;
+            rotating=false;
             const countryCode = d.properties.ISO_A3;
             // rotating = false;
             // Get the life expectancy, GDP, and vaccinatio200n data for the country
@@ -267,13 +218,13 @@ incrementYearAndDrawMap(geojson);
         })
         .on("mousemove", function(event) {
             // Move the tooltip to follow the mouse
-            changing = false;
+            rotating = false;
             tooltip.style("left", (event.pageX + 10) + "px")
                    .style("top", (event.pageY - 30) + "px");
         })
         .on("mouseout", function() {
             // Hide the tooltip when the mouse leaves the country
-            changing = true;
+            rotating = true;
             tooltip.style("display", "none");
         });
     
@@ -286,7 +237,7 @@ incrementYearAndDrawMap(geojson);
 
     // The function that updates the year and redraws the map
     function update() {
-    if (changing) {
+    if (rotating) {
         // console.log(`Current Year: ${currentYear}`);
 
         // Increment the year, reset to 2000 if it exceeds 2020
@@ -315,7 +266,7 @@ function yearcontrol(geojson){
                     const enteredYear = +this.value;
                     if (enteredYear >= 2000 && enteredYear <= 2020) {
                         currentYear = enteredYear;
-                        changing = false; // Stop rotation
+                        rotating = false; // Stop rotation
                         drawmap(geojson, currentYear, selectedCountries);
                     } else {
                         alert("Please enter a year between 2000 and 2020.");
@@ -323,8 +274,8 @@ function yearcontrol(geojson){
                     }
                 });
         playButton.on("click", function () {
-        changing = !changing; // Toggle automatic updates
-        if (changing) {
+        rotating = !rotating; // Toggle automatic updates
+        if (rotating) {
             playButton.text("Pause");
             incrementYearAndDrawMap(geojson);
         } else {
