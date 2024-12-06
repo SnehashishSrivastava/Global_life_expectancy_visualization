@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -96,28 +97,31 @@
 <body>
     <div id="line-chart-container">
         <div class="dropdown-container">
+           
             <div>
-                <label for="x-axis-dropdown">X Axis:</label>
-                <select class="dropdown" id="x-axis-dropdown">
-                    <option value="%vaccinated">Vaccination Rate</option>
+                <label for="y-axis-dropdown">Y Axis:</label>
+                <select class="dropdown" id="y-axis-dropdown">
+                    <option value="Life_expectancy">Life Expectancy</option>
                     <option value="%gdpa">GDP Allocation</option>
+                    <option value="%vaccinated">Vaccination Rate</option>
                     <option value="Year">Year</option>
                 </select>
             </div>
             <div>
-                <label for="y-axis-dropdown">Y Axis:</label>
-                <select class="dropdown" id="y-axis-dropdown">
-                    <option value="%gdpa">GDP Allocation</option>
+                <label for="x-axis-dropdown">X Axis:</label>
+                <select class="dropdown" id="x-axis-dropdown">
                     <option value="%vaccinated">Vaccination Rate</option>
+                    <option value="Life_expectancy">Life Expectancy</option>
+                    <option value="%gdpa">GDP Allocation</option>
                     <option value="Year">Year</option>
                 </select>
             </div>
             <div>
                 <label for="size-dropdown">Ball Size:</label>
                 <select class="dropdown" id="size-dropdown">
-                    <option value="Life_expectancy">Life Expectancy</option>
-                    <option value="%vaccinated">Vaccination Rate</option>
                     <option value="%gdpa">GDP Allocation</option>
+                    <option value="%vaccinated">Vaccination Rate</option>
+                    <option value="Life_expectancy">Life Expectancy</option>                    
                 </select>
             </div>
         </div>
@@ -126,6 +130,7 @@
             <label for="year-input">Year:</label>
             <input id="year-input" class="control" type="number" min="2000" max="2020" step="1" value="2000">
             <button id="set-year" class="control-btn">Set Year</button>
+            <button id="toggle-collapse" class="control-btn">Collapse</button>
         </div>
     </div>
     <div class="legend-container">
@@ -135,9 +140,10 @@
     <div class="tooltip"></div>
 
     <script>
-        const margin = { top: 60, right: 50, bottom: 50, left: 50 };
+        const margin = { top: 100, right: 100, bottom: 50, left: 50 };
         const width = 900 - margin.left - margin.right;
         const height = 550 - margin.top - margin.bottom;
+        let isCollapsed = false;
 
         const xScale = d3.scaleLinear().range([0, width]);
         const yScale = d3.scaleLinear().range([height, 0]);
@@ -149,6 +155,7 @@
         const sizeDropdown = document.getElementById("size-dropdown");
         const yearInput = document.getElementById("year-input");
         const toggleAnimationButton = document.getElementById("toggle-animation");
+        const toggleCollapseButton = document.getElementById("toggle-collapse");
 
         let animationRunning = true;
         let currentYear = 2000;
@@ -197,6 +204,78 @@
             function renderChart(xFeature, yFeature, sizeFeature) {
                 svg.selectAll(".trail").remove();
                 svg.selectAll(".marks").remove();
+                if (!isCollapsed){
+                    svg.selectAll(".collapsed-circle").remove();
+                }
+                if (isCollapsed) {
+        // Calculate averages for the collapsed state
+        function animateCollapsed() {
+            const visibleData = data.filter(d => !hiddenCountries.has(d.Entity) && d.Year === currentYear);
+
+            if (visibleData.length > 0) {
+                const avgX = d3.mean(visibleData, d => d[xFeature]);
+                const avgY = d3.mean(visibleData, d => d[yFeature]);
+                const avgSize = d3.mean(visibleData, d => d[sizeFeature]);
+
+                svg.selectAll(".collapsed-circle")
+    .data([1]) // Single collapsed ball
+    .join("circle")
+    .attr("class", "collapsed-circle")
+    .transition()
+    .duration(1000)
+    .attr("cx", xScale(avgX))
+    .attr("cy", yScale(avgY))
+    .attr("r", sizeScale(avgSize))
+    .style("fill", "gray")
+    .style("opacity", 0.7);
+
+// Select the collapsed circle after it has been drawn
+let collapsedCircle = svg.selectAll(".collapsed-circle");
+
+// Add mouseover and mouseout events
+collapsedCircle
+    .on("mouseover", function (event) {
+        d3.select(this) // Select the hovered element
+            .transition()
+            .duration(200)
+            .attr("r", sizeScale(avgSize) * 1.2); // Enlarge the circle by 20%
+        tooltip.style("display", "block")
+            .html(`
+                <strong>${xFeature}:</strong> ${avgX.toFixed(2)}<br>
+                <strong>Year:</strong> ${currentYear}<br>
+                <strong>${yFeature}:</strong> ${avgY.toFixed(2)}<br>
+                <strong>${sizeFeature}:</strong> ${avgSize.toFixed(2)}
+            `)
+            .style("left", `${event.pageX + 10}px`)
+            .style("top", `${event.pageY + 10}px`);
+    })
+    .on("mouseout", function () {
+        d3.select(this) // Select the hovered element
+            .transition()
+            .duration(200)
+            .attr("r", sizeScale(avgSize)); // Reset the circle size
+        tooltip.style("display", "none");
+    });
+
+    }
+
+
+            // Update year and re-animate
+            currentYear = currentYear < 2020 ? currentYear + 1 : 2000;
+            yearInput.value = currentYear; // Sync year input with animation
+            if (animationRunning) setTimeout(animateCollapsed, 1000); // Repeat animation
+        }
+
+        animateCollapsed();
+        return; // Skip rendering individual circles
+    } else {
+        // Remove the collapsed circle when expanding back
+        svg.selectAll(".collapsed-circle")
+            .transition()
+            .duration(1000)
+            .attr("r", 0)
+            .remove();
+    }
 
                 countries.forEach(country => {
                     if (!hiddenCountries.has(country)) {
@@ -216,21 +295,27 @@
                             const nextData = countryData[nextIndex];
 
                             if (currentData && nextData) {
-                                const trail = svg.append("g").attr("class", "trail");
-
                                 trail.append("line")
                                     .attr("x1", xScale(currentData[xFeature]))
                                     .attr("y1", yScale(currentData[yFeature]))
                                     .attr("x2", xScale(currentData[xFeature]))
                                     .attr("y2", yScale(currentData[yFeature]))
                                     .attr("stroke", colorScale(country))
-                                    .attr("stroke-width", sizeScale(currentData[sizeFeature]) / 2)
-                                    .style("stroke-opacity", 0)
+                                    .attr("stroke-width", sizeScale(currentData[sizeFeature]) )
+                                    .style("stroke-opacity", 0.3)
                                     .transition()
                                     .duration(2000)
                                     .ease(d3.easeCubicInOut)
                                     .attr("x2", xScale(nextData[xFeature]))
-                                    .attr("y2", yScale(nextData[yFeature]));
+                                    .attr("y2", yScale(nextData[yFeature]))
+                                    .on("end", function () {
+        // After the first animation, make the trail disappear
+        d3.select(this)
+            .transition()
+            .duration(1000) // 1 second duration
+            .style("stroke-opacity", 0) // Fade out
+            .remove(); // Remove the line after fading out
+    });
 
                                 marks.selectAll("circle")
                                     .data([nextData])
@@ -240,6 +325,7 @@
                                     .attr("cx", xScale(currentData[xFeature]))
                                     .attr("cy", yScale(currentData[yFeature]))
                                     .on("mouseover", function (event, d) {
+                                        animationRunning = false;
                                         tooltip.style("display", "block")
                                             .html(`
                                                 <strong>Country:</strong> ${country}<br>
@@ -251,7 +337,12 @@
                                             .style("left", `${event.pageX + 10}px`)
                                             .style("top", `${event.pageY + 10}px`);
                                     })
-                                    .on("mouseout", () => tooltip.style("display", "none"))
+                                    .on("mouseout", () => {
+                                        animationRunning = true;
+                                        tooltip.style("display", "none");
+                                        currentYear=currentYear+1
+                                        renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+                            })
                                     .transition()
                                     .duration(2000)
                                     .ease(d3.easeCubicInOut)
@@ -260,7 +351,9 @@
 
                                 yearIndex = nextIndex;
                                 currentYear = nextData.Year;
+                                
                                 setTimeout(animate, 2000);
+                                yearInput.value = currentYear;
                             }
                         }
 
@@ -268,7 +361,12 @@
                     }
                 });
             }
-
+            
+            toggleCollapseButton.addEventListener("click", () => {
+    isCollapsed = !isCollapsed;
+    toggleCollapseButton.textContent = isCollapsed ? "Expand" : "Collapse";
+    renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+});
             toggleAnimationButton.addEventListener("click", () => {
                 animationRunning = !animationRunning;
                 toggleAnimationButton.textContent = animationRunning ? "Stop Animation" : "Resume Animation";
@@ -281,6 +379,7 @@
                 const year = +yearInput.value;
                 if (year >= 2000 && year <= 2020) {
                     currentYear = year;
+                    // yearInput.value = currentYear;
                     renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
                 }
             });
