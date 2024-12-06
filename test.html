@@ -1,0 +1,68 @@
+function animate() {
+    if (!animationRunning) return;
+
+    const currentData = country.values[yearIndex];
+    const nextYearIndex = (yearIndex + 1) % country.values.length;
+    const nextData = country.values[nextYearIndex];
+
+    if (currentData && nextData) {
+        const trailLine = trail.selectAll("line")
+            .data([nextData])
+            .join("line")
+            .attr("x1", d => vaccinationScale(currentData['%vaccinated']))
+            .attr("y1", d => gdpaScale(currentData['%gdpa']))
+            .attr("x2", d => vaccinationScale(currentData['%vaccinated']))
+            .attr("y2", d => gdpaScale(currentData['%gdpa']))
+            .attr("stroke", colorScale(country.name))
+            .attr("stroke-width", lifeExpScale(nextData['Life_expectancy']) / 2);
+
+        trailLine.transition()
+            .duration(1000)
+            .attr("x2", d => vaccinationScale(nextData['%vaccinated']))
+            .attr("y2", d => gdpaScale(nextData['%gdpa']));
+
+        const ball = marks.selectAll("circle")
+            .data([nextData])
+            .join("circle")
+            .attr("r", lifeExpScale(nextData['Life_expectancy']))
+            .style("fill", colorScale(country.name))
+            .style("opacity", d => d['Life_expectancy'] < 47 ? 1 : 0.6)
+            .attr("cx", vaccinationScale(currentData['%vaccinated']))
+            .attr("cy", gdpaScale(currentData['%gdpa']))
+            .on("mouseover", function (event, d) {
+                tooltip.style("display", "block")
+                    .html(`
+                        <strong>Country:</strong> ${country.name}<br>
+                        <strong>Year:</strong> ${d.Year}<br>
+                        <strong>% Vaccinated:</strong> ${d['%vaccinated']}<br>
+                        <strong>% GDP:</strong> ${d['%gdpa']}<br>
+                        <strong>Life Expectancy:</strong> ${d['Life_expectancy']}
+                    `)
+                    .style("left", `${event.pageX + 10}px`)
+                    .style("top", `${event.pageY + 10}px`);
+            })
+            .on("mouseout", function () {
+                tooltip.style("display", "none");
+            });
+
+        ball.transition()
+            .duration(1000)
+            .attr("cx", vaccinationScale(nextData['%vaccinated']))
+            .attr("cy", gdpaScale(nextData['%gdpa']));
+
+        if (nextData['Life_expectancy'] < 47) {
+            ball.raise(); // Bring to the top
+            ball.transition()
+                .duration(500)
+                .style("opacity", 0.8)
+                .transition()
+                .duration(500)
+                .style("opacity", 1);
+        }
+    }
+
+    yearIndex = nextYearIndex;
+    setTimeout(animate, 1000);
+}
+
+animate();

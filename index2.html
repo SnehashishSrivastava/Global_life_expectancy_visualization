@@ -69,6 +69,10 @@
     <div id="controls">
         <input type="text" id="search-bar" placeholder="Search for a country...">
         <div>
+            <label for="filter-toggle" class="filter-switch">
+                <input type="checkbox" id="filter-toggle" />
+                <span class="slider"></span> Filters
+            </label>
             <input type="checkbox" id="select-all"> Select All
         </div>
         <div id="country-list">
@@ -85,7 +89,9 @@
     <script>
 const width = 960, height = 600;
 let lifeExpectancyData;
-
+let cylinder=true;
+const gdpaScale = d3.scaleLinear().range([0, 50]); // Max bar height 50 for %gdpa
+const vaccinationScale = d3.scaleLinear().range([0, 50]);
 
 // Create an SVG container
 const svg = d3.select("#map")
@@ -113,49 +119,31 @@ let currentYear = 2000;
     // const currentYear = "2008";
      lifeExpectancyData = data;
     // let selectedCountries = [];
+    gdpaScale.domain(d3.extent(data, d => +d['%gdpa']));
+    vaccinationScale.domain(d3.extent(data, d => +d['%vaccinated']));
     // Map country codes to life expectancy
     const lifeExpMap = new Map(lifeExpectancyData.map(d => [d.Code, +d.Life_expectancy]));
     
     // Define a color scale
      colorScale
         .domain(d3.extent(lifeExpectancyData, d => +d.Life_expectancy));
+        draw_run_map(geojson,currentYear ,selectedCountries);
 
-    // Add a legend
-    drawmap(geojson, currentYear, selectedCountries);
+
+
+    
+    })
+})
+    function draw_run_map(geojson,year ,selectedCountries){
+        drawmap(geojson, currentYear, selectedCountries);
     // console.log(geojson);
     setupCountryControls(geojson);
+    addegend();
 
 // Initialize controls and automatic updates
 yearcontrol(geojson);
 incrementYearAndDrawMap(geojson);
-    const legend = svg.append("g")
-        .attr("transform", `translate(${width - 50}, 100)`);
-
-    const legendScale = d3.scaleLinear()
-        .domain(colorScale.domain())
-        .range([0, 100]);
-
-    legend.selectAll("rect")
-        .data(d3.range(0, 1.01, 0.1))
-        .enter().append("rect")
-        .attr("x", (d, i) => i * 10)
-        .attr("width", 10)
-        .attr("height", 10)
-        .attr("fill", d => colorScale(d * (colorScale.domain()[1] - colorScale.domain()[0]) + colorScale.domain()[0]));
-
-    legend.append("text")
-        .attr("x", 0)
-        .attr("y", 25)
-        .text(colorScale.domain()[0]);
-
-    legend.append("text")
-        .attr("x", 100)
-        .attr("y", 25)
-        .attr("text-anchor", "end")
-        .text(colorScale.domain()[1]);
-    // drawmap(geojson,currentYear,selectedCountries)
-})
-    })
+    }
     function drawmap(geojson,year,selectedCountries){
         // console.log(d);
         // const lifeExpMap = new Map(lifeExpectancyData.map(d => [d.Code, +d.Life_expectancy]));
@@ -227,7 +215,71 @@ incrementYearAndDrawMap(geojson);
             rotating = true;
             tooltip.style("display", "none");
         });
-    
+        if(cylinder){
+            svg.append("g").selectAll(".bar-chart")
+            .data(geojson.features.filter(d => selectedCountries.length==0 || selectedCountries.includes(d.id)))
+            .enter().append("g")
+                .attr("class", "bar-chart")
+                .attr("transform", d => {
+    let centroid;
+        centroid = path.centroid(d);
+        
+    return `translate(${centroid[0] || 0}, ${centroid[1] || 0})`;
+})
+.style("opacity", d => {
+    // Make transparent if the centroid is invalid
+    const centroid = path.centroid(d);
+    return isNaN(centroid[0]) || isNaN(centroid[1]) ? 0 : 1;
+})
+                .each(function(d) {
+                    const countryCode = d.id;
+                    // console.log("Country Code:", countryCode, "GDP:", countryData[countryCode]?.gdpa|| 0, "Vaccinated:", countryData[countryCode]?.vaccinated|| 0);
+                    const gdpa = countryData[countryCode]?.gdpa || 0;
+                    const vaccinated = countryData[countryCode]?.vaccinated || 0;
+                    const gdpaRadius = Math.max(0, gdpaScale(gdpa));  // Ensure non-negative height
+                    const vaccinatedHeight = Math.max(0, vaccinationScale(vaccinated));
+                    const growth=countryData[countryCode]?.growth
+                    const topColor = "#1f77b4";  // Blue for the top
+                    const bodyColor = "#ff7f0e"; // Orange for the body
+                    const bottomColor = "#ff7f0e"; // Orange for the bottom
+            //         const gradient = svg.append("defs")
+            // .append("linearGradient")
+            // .attr("id", `gradient-${countryCode}`)
+            // .attr("x1", "0%").attr("y1", "0%").attr("x2", "100%").attr("y2", "100%")
+            // .append("stop").attr("offset", "0%").attr("stop-color", "#ffffff").attr("stop-opacity", 0.6)
+            // .append("stop").attr("offset", "100%").attr("stop-color", "#333333").attr("stop-opacity", 0.8);
+
+        // Create the 3D Cylinder (Top, Body, and Bottom)
+        const cylinderGroup = d3.select(this);
+
+        // Top ellipse of the cylinder (for 3D effect)
+        cylinderGroup.append("ellipse")
+            .attr("cx", 0)
+            .attr("cy", -vaccinatedHeight / 2)  // Position it above the body
+            .attr("rx", gdpaRadius)
+            .attr("ry", gdpaRadius / 2)  // Flatten the ellipse a bit for 3D effect
+            .attr("fill", topColor)
+            .style("opacity",0.5);
+
+        // Body of the cylinder (rectangle representing the height)
+        cylinderGroup.append("rect")
+            .attr("x", -gdpaRadius)
+            .attr("y", -vaccinatedHeight / 2)  // Align with the top ellipse
+            .attr("width", gdpaRadius * 2)
+            .attr("height", vaccinatedHeight)
+            .attr("fill", bodyColor)
+            .style("opacity",0.5);
+        // Bottom ellipse of the cylinder (for 3D effect)
+        cylinderGroup.append("ellipse")
+            .attr("cx", 0)
+            .attr("cy", vaccinatedHeight / 2)  // Position it below the body
+            .attr("rx", gdpaRadius)
+            .attr("ry", gdpaRadius / 2)  // Flatten the ellipse a bit for 3D effect
+            .attr("fill", bottomColor)
+            .style("opacity",0.5);
+    });
+
+};  
 
         
     }
@@ -283,10 +335,80 @@ function yearcontrol(geojson){
         } // Pass the updated input element
                 });
             };
+            function addLegend() {
+    const legendWidth = 200, legendHeight = 10;
+
+    // Create the defs for the gradient
+    const defs = svg.append("defs");
+
+    const gradient = defs.append("linearGradient")
+        .attr("id", "legend-gradient")
+        .attr("x1", "0%")
+        .attr("y1", "0%")
+        .attr("x2", "100%")
+        .attr("y2", "0%");
+
+    // Define stops for the gradient
+    const numStops = 10;
+    const colorDomain = colorScale.domain();
+    const rangeStep = (colorDomain[1] - colorDomain[0]) / (numStops - 1);
+
+    for (let i = 0; i < numStops; i++) {
+        gradient.append("stop")
+            .attr("offset", `${(i / (numStops - 1)) * 100}%`)
+            .attr("stop-color", colorScale(colorDomain[0] + i * rangeStep));
+    }
+
+    // Append the legend group
+    const legendSvg = svg.append("g")
+        .attr("class", "legend")
+        .attr("transform", `translate(${width - legendWidth - 50}, 100)`);
+
+    // Draw the rectangle filled with the gradient
+    legendSvg.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", legendWidth)
+        .attr("height", legendHeight)
+        .style("fill", "url(#legend-gradient)");
+
+    // Add a title to the legend
+    legendSvg.append("text")
+        .attr("class", "legend-title")
+        .attr("x", legendWidth / 2)
+        .attr("y", -10)
+        .style("text-anchor", "middle")
+        .text("Life Expectency");
+
+    // Set up the scale for the axis
+    const legendScale = d3.scaleLinear()
+        .range([0, legendWidth])
+        .domain(colorDomain);
+
+    // Define and append the axis
+    const legendAxis = d3.axisBottom(legendScale)
+        .tickFormat(d3.format(".0f"))
+        .ticks(6);
+
+    legendSvg.append("g")
+        .attr("class", "legend-axis")
+        .attr("transform", `translate(0, ${legendHeight})`)
+        .call(legendAxis);
+}
     function setupCountryControls(geojson) {
             const searchBar = d3.select("#search-bar");
             const countryList = d3.select("#country-list");
             const selectAllCheckbox = d3.select("#select-all");
+            const filterToggle = d3.select("#filter-toggle");
+            
+    filterToggle.on("change", function() {
+        filterEnabled = this.checked;
+        // toggleFilterVisibility(filterEnabled);
+        cylinder = filterEnabled;  // Update the 'cylinder' variable based on the filter status
+        console.log("Filter status (cylinder):", cylinder);
+        if(cylinder){drawmap(geojson, currentYear,selectedCountries);        } // Logs the updated value of cylinder
+    });
+    if(!cylinder){svg.selectAll("bar-graph").remove();}
             // console.log("country-control",geojson.features.id);
             // Populate the country list with checkboxes
             geojson.features.forEach(country => {

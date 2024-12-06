@@ -183,7 +183,9 @@
           <span class="switch-handle"></span>
         </label>
       </div>
+<script type="text/javascript" src="functions.js"></script>
     <script>
+        
 const width = 800, height = 600;
 const svg = d3.select("#plot")
             .attr("width", width)
@@ -201,7 +203,7 @@ const projection = d3.geoOrthographic()
 const toggleSwitch = document.getElementById('toggleSwitch');
 let duration=10000;
 let rotating=true;
-let currentYear = 2000;
+let currentYear = 2003;
         let selectedCountries = [];
         let lifeExpectancyData;
         let rotationSpeed = 1.5; // Rotation speed per tick
@@ -220,7 +222,7 @@ let currentYear = 2000;
         let globepath=d3.geoPath().projection(projection);
         let mappath=d3.geoPath().projection(mapProjection);
 
-        d3.json("https://raw.githubusercontent.com/johan/world.geo.json/refs/heads/master/countries.geo.json").then(function(geojson) {
+        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(geojson) {
             d3.csv("lifeexp.csv").then(function(data) {
 
                 // Store life expectancy data for all years
@@ -245,737 +247,86 @@ let currentYear = 2000;
 if (toggleSwitch.checked) {
     // Initialize Globe Visualization
     // mappath=
-    svg.selectAll(".bar-chart").remove();
-    path = globepath;
-    rotating=false;
+    d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(geojson) {
+            d3.csv("lifeexp.csv").then(function(data) {
 
-    drawGlobe(geojson, currentYear, selectedCountries);
-    rotating=true;
+                // Store life expectancy data for all years
+                lifeExpectancyData = data;
+                // selectedCountries = Array.from(new Set(geojson.map(d => d.Code)));
 
-    rotateGlobe(geojson, yearLabel);
-    addLegend();
-    enableDragging();
-    setupCountryControls(geojson);
-    yearcontrol_globe(geojson);
-    globepath=path;
+                // Set color scale domain dynamically based on life expectancy values
+                colorScale.domain(d3.extent(data, d => +d['Life_expectancy']));
+                
+                                
+                // Set bar chart scales domain
+                gdpaScale.domain(d3.extent(data, d => +d['%gdpa']));
+                vaccinationScale.domain(d3.extent(data, d => +d['%vaccinated']));
+
+                // Add year label to the top-left corner
+                const yearLabel = svg.append("text")
+                    .attr("x", 20)
+                    .attr("y", 40)
+                    .attr("font-size", "24px")
+                    .attr("fill", "#333")
+                    .text();
+                draw_run_globe(geojson, currentYear ,selectedCountries);
+
+            });
+        });
+    // globepath=path;
 
   } else {
-    // Initialize Map Visualization
-    rotating=false;
+    // mappath=
+    d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(function(geojson) {
+            d3.csv("lifeexp.csv").then(function(data) {
 
-    svg.selectAll(".bar-chart").remove();
-    path = mappath;
+                // Store life expectancy data for all years
+                lifeExpectancyData = data;
+                // selectedCountries = Array.from(new Set(geojson.map(d => d.Code)));
 
-    drawmap(geojson, currentYear, selectedCountries);
-    rotating=true;
+                // Set color scale domain dynamically based on life expectancy values
+                colorScale.domain(d3.extent(data, d => +d['Life_expectancy']));
+                
+                                
+                // Set bar chart scales domain
+                gdpaScale.domain(d3.extent(data, d => +d['%gdpa']));
+                vaccinationScale.domain(d3.extent(data, d => +d['%vaccinated']));
 
-    setupCountryControls_map(geojson);
-    yearcontrol_map(geojson);
-    incrementYearAndDrawMap(geojson);
-    addLegend();
-    svg.call(
-        d3.zoom()
-            .extent([[0,0],[1000,800]])
-            .scaleExtent([1,12])
-            .on('zoom',d=>{
-                    main.attr("transform",d.transform)
-            }
-            )
-    )
-    // mappath=path
+                // Add year label to the top-left corner
+                const yearLabel = svg.append("text")
+                    .attr("x", 20)
+                    .attr("y", 40)
+                    .attr("font-size", "24px")
+                    .attr("fill", "#333")
+                    .text();
+                    draw_run_map(geojson, currentYear, selectedCountries);
+            });
+        });
+    //  path=mappath;
+    // rotating=true;
+    
+
   }
     
-                    toggleSwitch.addEventListener('change', (event) => {
+toggleSwitch.addEventListener('change', (event) => {
 
-  if (event.target.checked) {
+  if (event.target.checked) { 
     svg.selectAll(".path").remove();
     svg.selectAll(".bar-chart").remove();
-    // Call function2 for Map Visualization
-     path =globepath;
-    drawGlobe(geojson, currentYear ,selectedCountries);
-    
+    path = globepath;
+    rotating=true;
 
-                // Start the rotation animation
-                rotateGlobe(geojson, yearLabel);
-
-                // Add heatmap legend
-                addLegend(); 
-
-                // Enable dragging interaction
-                enableDragging();
-                setupCountryControls(geojson);
-                yearcontrol_globe(geojson);
+draw_run_globe(geojson, currentYear, selectedCountries,projection);
     
   } else {
     // Call function1 for Globe Visualization
     svg.selectAll(".path").remove();
     svg.selectAll(".bar-chart").remove();
-     path = mappath;
-    drawmap(geojson, currentYear, selectedCountries);
-    // console.log(geojson);
-    setupCountryControls_map(geojson);
-
-// Initialize controls and automatic updates
-yearcontrol_map(geojson);
-incrementYearAndDrawMap(geojson);
-addLegend()
-    
-  }
+    path=mappath;
+    rotating=true;
+    draw_run_map(geojson, currentYear, selectedCountries);
+}
 });})})
-function drawmap(geojson,year,selectedCountries){
-        // console.log(lifeExpectancyData);
-        // const lifeExpMap = new Map(lifeExpectancyData.map(d => [d.Code, +d.Life_expectancy]));
-        const filteredData = lifeExpectancyData.filter(d => +d['Year'] == year  && 
-            (selectedCountries.length === 0 || selectedCountries.includes(d.Code)));
-            const countryData = {};
-            filteredData.forEach(d => {
-                // console.log(d)
-                countryData[d['Entity']] = {
-                    lifeExpectancy: +d['Life_expectancy'],
-                    gdpa: +d['%gdpa'],
-                    vaccinated: +d['%vaccinated']
-                };
-            });
-        // console.log("Country Data Lookup:", countryData);
-            // const lifeExpScale = d3.scaleSequential(d3.interpolateRgb.gamma(1.2)("orange","green")) // A color scale for life expectancy
-        //     let colorScale =d3.scaleSequential(d3.interpolateRgb.gamma(1.2)( "red","green"))
-        // .domain(d3.extent(lifeExpectancyData, d => +d.Life_expectancy));
-
-            // Clear the previous map and draw new paths
-            svg.selectAll(".bar-chart").remove();
-            svg.append("g")
-                .selectAll("path")
-                .data(geojson.features)
-                .enter().append("path")
-                .attr("d", path)
-                .attr("fill", d => {
-
-                    // console.log(d);
-                    const countryCode = d.properties.name;
-                    const lifeExp = countryData[countryCode]?.lifeExpectancy;
-                    // let color = colorScale(lifeExp);
-                    // console.log("h`e`r`e:" ,countryCode,lifeExp);
-                return  lifeExp ? colorScale(lifeExp) : "#ccc";;  // Return the adjusted color
-            })   
-            .attr("stroke", "#fff")
-                .on("mouseover", function(event, d) {
-            // Get the country code for the hovered country
-            rotating=false;
-            const countryCode = d.properties.name;
-            // console.log(countryData);
-            // rotating = false;
-            // Get the life expectancy, GDP, and vaccinatio200n data for the country
-            const lifeExp = countryData[countryCode]?.lifeExpectancy;
-            const gdpa = countryData[countryCode]?.gdpa;
-            const vaccinated = countryData[countryCode]?.vaccinated;
-                    
-            // projection.rotating=false;
-
-            // Only show the tooltip if any data is available for the country
-            if (lifeExp !== undefined || gdpa !== undefined || vaccinated !== undefined) {
-                // Construct the tooltip content
-                // console.log(d.properties);
-                let tooltipContent = `<strong>${d.properties.ADMIN}</strong><br>`;
-                tooltipContent += `Life Expectancy: ${lifeExp}<br>`;
-                tooltipContent += `Vaccinated: ${vaccinated}%`;
-                tooltipContent += `GDP: ${gdpa}%<br>`;
-                
-        
-
-                // Display the tooltip with the data
-                tooltip.style("display", "block")
-                    .html(tooltipContent);
-            }
-        })
-        .on("mousemove", function(event) {
-            // Move the tooltip to follow the mouse
-            rotating = false;
-            tooltip.style("left", (event.pageX + 10) + "px")
-                   .style("top", (event.pageY - 30) + "px");
-        })
-        .on("mouseout", function() {
-            // Hide the tooltip when the mouse leaves the country
-            rotating = true;
-            tooltip.style("display", "none");
-        });
-    
-
-        
-    }
-    function incrementYearAndDrawMap(geojson) {
-    // Define the current year globally within the function
-    // let currentYear = 2000; 
-
-    // The function that updates the year and redraws the map
-    function update() {
-        svg.selectAll(".bar-chart").remove();
-    if (rotating) {
-        // console.log(`Current Year: ${currentYear}`);
-
-        // Increment the year, reset to 2000 if it exceeds 2020
-        currentYear = currentYear < 2020 ? currentYear + 1 : 2000;
-
-        // Update the year input field
-        const yearInput = d3.select("#year-input");
-        if (yearInput.node()) {
-            yearInput.node().value = currentYear;
-        }
-
-        // Redraw the map with the updated year
-        drawmap(geojson, currentYear, selectedCountries);
-
-        // Schedule the next update
-        setTimeout(update, duration);
-    }
-}
-update();
-}
-function yearcontrol_map(geojson){
-            const yearInput = d3.select("#year-input");
-                const playButton = d3.select("#play-button");
-
-                yearInput.on("change", function () {
-                    const enteredYear = +this.value;
-                    if (enteredYear >= 2000 && enteredYear <= 2020) {
-                        currentYear = enteredYear;
-                        rotating = false; // Stop rotation
-                        drawmap(geojson, currentYear, selectedCountries);
-                    } else {
-                        alert("Please enter a year between 2000 and 2020.");
-                        this.value = currentYear; // Reset input to the current year
-                    }
-                });
-        playButton.on("click", function () {
-        rotating = !rotating; // Toggle automatic updates
-        if (rotating) {
-            playButton.text("Pause");
-            incrementYearAndDrawMap(geojson);
-        } else {
-            playButton.text("Play");
-        } // Pass the updated input element
-                });
-            };
-    function setupCountryControls_map(geojson) {
-            const searchBar = d3.select("#search-bar");
-            const countryList = d3.select("#country-list");
-            const selectAllCheckbox = d3.select("#select-all");
-            // console.log("country-control",geojson.features.id);
-            // Populate the country list with checkboxes
-            geojson.features.forEach(country => {
-                const countryCode = country.id;
-                const countryName = country.properties.name;
-                // console.log(countryCode,countryName);
-
-
-                const div = countryList.append("div").attr("class", "country-checkbox");
-                div.append("input")
-                    .attr("type", "checkbox")
-                    .attr("id", `checkbox-${countryCode}`)
-                    .attr("value", countryCode)
-                    .on("change", function() {
-                if (this.checked) {
-                    selectedCountries.push(countryCode);
-                    // console.log(countryCode);
-                    drawmap(geojson, currentYear,selectedCountries);
-                    // console.log(selectedCountries);
-                     // Add country to the selection
-                } else {
-                    selectedCountries = selectedCountries.filter(c => c !== countryCode);
-                    drawmap(geojson, currentYear,selectedCountries);
-                     // Remove from the selection
-                }
-            });
-                div.append("label").attr("for", `checkbox-${countryCode}`).text(countryName);
-            });
-
-            // Filter country list based on search input
-            searchBar.on("input", function() {
-                const query = this.value.toLowerCase();
-                countryList.selectAll(".country-checkbox").style("display", function() {
-                    const countryName = d3.select(this).select("label").text().toLowerCase();
-                    return countryName.includes(query) ? "block" : "none";
-                });
-            });
-
-            // Select or deselect all countries when the "Select All" checkbox is clicked
-            
-            selectAllCheckbox.on("click", function() {
-        const isChecked = this.checked;
-        selectedCountries = isChecked ? geojson.features.map(country => country.id) : []; // Clear the array and add all country codes if checked
-
-        // Set the checkboxes state based on "Select All"
-        countryList.selectAll("input[type='checkbox']")
-            .property("checked", isChecked); // Set all checkboxes to match the "Select All" checkbox state
-    }); }
-    function drawGlobe(geojson, year,selectedCountries) {
-            // Filter data for the current year
-       
-            svg.selectAll(".bar-chart").remove();
-            const filteredData = lifeExpectancyData.filter(d => +d['Year'] == year  && 
-            (selectedCountries.length === 0 || selectedCountries.includes(d.Code))
-);
-
-            // Create a lookup for life expectancy and other data by country code
-            const countryData = {};
-            filteredData.forEach(d => {
-                countryData[d['Code']] = {
-                    lifeExpectancy: +d['Life_expectancy'],
-                    gdpa: +d['%gdpa'],
-                    vaccinated: +d['%vaccinated'],
-                    growth: d['growth'] 
-                };
-            });
-            // console.log("Country Data Lookup:", countryData);
-            // const lifeExpScale = d3.scaleSequential(d3.interpolateRgb.gamma(1.2)("orange","green")) // A color scale for life expectancy
-
-
-            // Clear the previous map and draw new paths
-            svg.selectAll("path").remove();
-            svg.append("g")
-                .selectAll("path")
-                .data(geojson.features)
-                .enter().append("path")
-                .attr("d", path)
-                .attr("fill", d => {
-                    const countryCode = d.id;
-                    const lifeExp = countryData[countryCode]?.lifeExpectancy;
-                    let color = colorScale(lifeExp);
-
-                // Adjust the brightness based on life expectancy value
-                // const brightnessFactor = (lifeExp - 20) / (90 - 20);  // Normalize life expectancy to 0-1 scale
-                // const adjustedColor = adjustBrightness(color, 1 + brightnessFactor);  // Apply brightness adjustment
-
-                return color;  // Return the adjusted color
-            })          
-                .attr("stroke", "#fff")
-                .each(function(d) {
-                    const countryCode = d.id;
-                    // console.log("Country Code:", countryCode, "GDP:", countryData[countryCode]?.gdpa|| 0, "Vaccinated:", countryData[countryCode]?.vaccinated|| 0);
-                    const gdpa = countryData[countryCode]?.gdpa || 0;
-                    const vaccinated = countryData[countryCode]?.vaccinated || 0;
-                    const gdpaHeight = Math.max(0, gdpaScale(gdpa));  // Ensure non-negative height
-                    const vaccinatedHeight = Math.max(0, vaccinationScale(vaccinated));
-                    const growth=countryData[countryCode]?.growth
-                    // Draw the GDP b
-            // console.log(growth);
-        if (growth === "False") {
-            // Apply blinking animation for countries where growth is false
-            d3.select(this)
-                .transition()
-                .duration(500) // Duration of fade-out
-                .style("opacity", 0.2)
-                .transition()
-                .duration(500) // Duration of fade-in
-                .style("opacity", 1)
-                .on("end", function repeat() {
-                        d3.select(this)
-                            .transition()
-                            .duration(200)
-                            .style("opacity", 0.1)
-                            .transition()
-                            .duration(200)
-                            .style("opacity", 1)
-                            .on("end", repeat);
-                    });}})
-                
-                .on("mouseover", function(event, d) {
-            // Get the country code for the hovered country
-                
-            const countryCode = d.id;
-            rotating = false;
-            // Get the life expectancy, GDP, and vaccination data for the country
-            const lifeExp = countryData[countryCode]?.lifeExpectancy;
-            const gdpa = countryData[countryCode]?.gdpa;
-            const vaccinated = countryData[countryCode]?.vaccinated;
-            
-            // projection.rotating=false;
-
-            // Only show the tooltip if any data is available for the country
-            if (lifeExp !== undefined || gdpa !== undefined || vaccinated !== undefined) {
-                // Construct the tooltip content
-                let tooltipContent = `<strong>${d.properties.name}</strong><br>`;
-                tooltipContent += `Life Expectancy: ${lifeExp}<br>`;
-                tooltipContent += `Vaccinated: ${vaccinated}%`;
-                tooltipContent += `GDP: ${gdpa}%<br>`;
-                if(d.properties.name == undefined){
-                    console.log('name not def',d)
-
-                }
-                
-        
-
-                // Display the tooltip with the data
-                tooltip.style("display", "block")
-                    .html(tooltipContent);
-            }
-        })
-        .on("mousemove", function(event) {
-            // Move the tooltip to follow the mouse
-            rotating = false;
-            tooltip.style("left", (event.pageX + 10) + "px")
-                   .style("top", (event.pageY - 30) + "px");
-        })
-        .on("mouseout", function() {
-            // Hide the tooltip when the mouse leaves the country
-            rotating = true;
-            tooltip.style("display", "none");
-        });
-
-            // console.log("selectedCountries", selectedCountries);
-            svg.append("g").selectAll(".bar-chart")
-            .data(geojson.features.filter(d => selectedCountries.length==0 || selectedCountries.includes(d.id)))
-            .enter().append("g")
-                .attr("class", "bar-chart")
-                .attr("transform", d => {
-    let centroid;
-    try {
-        // Attempt to get centroid using D3's path.centroid method
-        centroid = path.centroid(d);
-        
-        // Check if centroid is valid
-        if (isNaN(centroid[0]) || isNaN(centroid[1])) {
-            // For Polygon type, calculate centroid manually if necessary
-            centroid = calculateCentroid(d.geometry.coordinates[0]);
-        }
-        
-    } catch (error) {
-        console.warn("Error calculating centroid for Polygon:", error, d);
-        // If path.centroid fails (likely due to MultiPolygon), calculate for MultiPolygon
-        try {
-            centroid = calculateMultiPolygonCentroid(d.geometry.coordinates);
-        } catch (multiError) {
-            console.error("Error calculating centroid for MultiPolygon:", multiError, d);
-            centroid = [0, 0];  // Default to (0, 0) in case of failure
-        }
-    }
-
-    // Return the transformation
-    return `translate(${centroid[0] || 0}, ${centroid[1] || 0})`;
-})
-// .style("opacity", d => {
-//     // const isInvalid = !centroid || isNaN(centroid[0]) || isNaN(centroid[1]);
-//     return isNaN(centroid[0]) || isNaN(centroid[1]) ? 0 : 1;
-// })
-                .each(function(d) {
-                    const countryCode = d.id;
-                    if(isNaN(countryCode)){
-                        console.log('nan code',d); 
-                    }
-                    "Country Code:", countryCode, "GDP:", countryData[countryCode]?.gdpa|| 0, "Vaccinated:", countryData[countryCode]?.vaccinated|| 0
-                    // console.log("Country Code:", countryCode, "GDP:", countryData[countryCode]?.gdpa|| 0, "Vaccinated:", countryData[countryCode]?.vaccinated|| 0);
-                    const gdpa = countryData[countryCode]?.gdpa || 0;
-                    const vaccinated = countryData[countryCode]?.vaccinated || 0;
-                    const gdpaHeight = Math.max(0, gdpaScale(gdpa));  // Ensure non-negative height
-                    const vaccinatedHeight = Math.max(0, vaccinationScale(vaccinated));
-                    const growth=countryData[countryCode]?.growth
-                    
-        if (gdpa > 0) {
-            d3.select(this).append("rect")
-                .attr("width", 5)
-                .attr("height", gdpaHeight)
-                .attr("x", -10)
-                .attr("y", -gdpaHeight)
-                .attr("fill", "#1f77b4");
-        }
-
-        // Draw the Vaccination bar only if there is non-zero data
-        if (vaccinated > 0) {
-            d3.select(this).append("rect")
-                .attr("width", 5)
-                .attr("height", vaccinatedHeight)
-                .attr("x", 5)
-                .attr("y", -vaccinatedHeight)
-                .attr("fill", "#ff7f0e");
-        }
-
-        })
-    }
-
-        // Function to smoothly rotate the globe and change year after a full rotation
-        function rotateGlobe(geojson, yearLabel) {
-            d3.timer(function() {
-                if (rotating) {
-                    // Update the rotation angle
-                    rotateAngle = (rotateAngle + rotationSpeed) % 360; // Ensure it stays within 0-360 degrees
-                    projection.rotate([rotateAngle, 0]);
-
-                    // Redraw the map with the updated rotation
-                    svg.selectAll("path").attr("d", path);
-                    svg.selectAll(".bar-chart")
-                    .attr("transform", d => {
-    let centroid;
-    try {
-        // Attempt to get centroid using D3's path.centroid method
-        centroid = path.centroid(d);
-        
-        // Check if centroid is valid
-        if (isNaN(centroid[0]) || isNaN(centroid[1])) {
-            // For Polygon type, calculate centroid manually if necessary
-            centroid = calculateCentroid(d.geometry.coordinates[0]);
-        }
-        
-    } catch (error) {
-        console.warn("Error calculating centroid for Polygon:", error, d);
-        // If path.centroid fails (likely due to MultiPolygon), calculate for MultiPolygon
-        try {
-            centroid = calculateMultiPolygonCentroid(d.geometry.coordinates);
-        } catch (multiError) {
-            console.error("Error calculating centroid for MultiPolygon:", multiError, d);
-            centroid = [0, 0];  // Default to (0, 0) in case of failure
-        }
-    }
-
-    // Return the transformation
-    return `translate(${centroid[0] || 0}, ${centroid[1] || 0})`;
-});
-
-// .style("opacity", d => {
-//     // const isInvalid = !centroid || isNaN(centroid[0]) || isNaN(centroid[1]);
-//     return isNaN(centroid[0]) || isNaN(centroid[1]) ? 0 : 1;
-// });
-
-                    // Detect when a full rotation (360 degrees) is completed
-    if (Math.abs(rotateAngle) < 1.5) {  // Close to 360 or 0 degrees
-        currentYear = currentYear < 2020 ? currentYear + 1 : 2000; // Cycle between 2000 and 2020
-                        const yearInput = d3.select("#year-input");
-                        yearInput.node().value = currentYear;
-                        drawGlobe(geojson, currentYear,selectedCountries); // Redraw the globe with the new year's data
-                    }
-                }
-            });
-        }
-        function addLegend() {
-    const legendWidth = 200, legendHeight = 10;
-
-    // Create the defs for the gradient
-    const defs = svg.append("defs");
-
-    const gradient = defs.append("linearGradient")
-        .attr("id", "legend-gradient")
-        .attr("x1", "0%")
-        .attr("y1", "0%")
-        .attr("x2", "100%")
-        .attr("y2", "0%");
-
-    // Define stops for the gradient
-    const numStops = 10;
-    const colorDomain = colorScale.domain();
-    const rangeStep = (colorDomain[1] - colorDomain[0]) / (numStops - 1);
-
-    for (let i = 0; i < numStops; i++) {
-        gradient.append("stop")
-            .attr("offset", `${(i / (numStops - 1)) * 100}%`)
-            .attr("stop-color", colorScale(colorDomain[0] + i * rangeStep));
-    }
-
-    // Append the legend group
-    const legendSvg = svg.append("g")
-        .attr("class", "legend")
-        .attr("transform", `translate(${width - legendWidth - 50}, 100)`);
-
-    // Draw the rectangle filled with the gradient
-    legendSvg.append("rect")
-        .attr("x", 0)
-        .attr("y", 0)
-        .attr("width", legendWidth)
-        .attr("height", legendHeight)
-        .style("fill", "url(#legend-gradient)");
-
-    // Add a title to the legend
-    legendSvg.append("text")
-        .attr("class", "legend-title")
-        .attr("x", legendWidth / 2)
-        .attr("y", -10)
-        .style("text-anchor", "middle")
-        .text("Life Expectency");
-
-    // Set up the scale for the axis
-    const legendScale = d3.scaleLinear()
-        .range([0, legendWidth])
-        .domain(colorDomain);
-
-    // Define and append the axis
-    const legendAxis = d3.axisBottom(legendScale)
-        .tickFormat(d3.format(".0f"))
-        .ticks(6);
-
-    legendSvg.append("g")
-        .attr("class", "legend-axis")
-        .attr("transform", `translate(0, ${legendHeight})`)
-        .call(legendAxis);
-}
-function calculateCentroid(polygon) {
-    const coordinates = polygon; // Outer ring
-    let area = 0;
-    let cx = 0, cy = 0;
-
-    for (let i = 0, len = coordinates.length; i < len - 1; i++) {
-        const [x1, y1] = coordinates[i];
-        const [x2, y2] = coordinates[i + 1];
-
-        const crossProduct = (x1 * y2 - x2 * y1);
-        area += crossProduct;
-        cx += (x1 + x2) * crossProduct;
-        cy += (y1 + y2) * crossProduct;
-    }
-
-    area = area / 2;
-    cx = cx / (6 * area);
-    cy = cy / (6 * area);
-
-    return { centroid: [cx, cy], area: Math.abs(area) };
-}
-
-function calculateMultiPolygonCentroid(multiPolygon) {
-    let totalArea = 0;
-    let centroidX = 0;
-    let centroidY = 0;
-
-    multiPolygon.forEach(polygon => {
-        const outerRing = polygon[0]; // The outer ring of the polygon
-        const { centroid, area } = calculateCentroid(outerRing);
-        totalArea += area;
-        centroidX += centroid[0] * area;
-        centroidY += centroid[1] * area;
-    });
-
-    return [centroidX / totalArea, centroidY / totalArea];
-}
-        
-
-        // Function to enable dragging interaction for the globe
-        function enableDragging() {
-    let rotate = [0, 0]; // Initial rotation [longitude, latitude]
-    let scale = 300; // Adjust this to match your globe's scale
-    // let projection = d3.geoOrthographic()
-    //     .scale(scale)
-    //     .translate([width / 2, height / 2])
-    //     .clipAngle(90)
-    //     .precision(0.6);
-
-    // let path = d3.geoPath().projection(projection);
-
-    svg.call(d3.drag()
-        .subject(() => {
-            const r = projection.rotate();
-            return { x: r[0] / scale, y: -r[1] / scale }; // Map rotation to dragging position
-        })
-        .on("drag", (event) => {
-            const dx = event.dx;
-            const dy = event.dy;
-
-            rotate[0] = rotate[0] + dx * 0.5; // Update longitude (X-axis)
-            rotate[1] = rotate[1] - dy * 0.5; // Update latitude (Y-axis)
-
-            rotate[1] = Math.max(-90, Math.min(90, rotate[1])); // Clamp latitude to [-90, 90]
-
-            projection.rotate(rotate);
-            svg.selectAll("path").attr("d", path);
-
-            // Update positions of bar charts or markers if present
-            svg.selectAll(".bar-chart")
-            .attr("transform", d => {
-    let centroid;
-    try {
-        // Attempt to get centroid using D3's path.centroid method
-        centroid = path.centroid(d);
-        
-        // Check if centroid is valid
-        if (isNaN(centroid[0]) || isNaN(centroid[1])) {
-            // For Polygon type, calculate centroid manually if necessary
-            centroid = calculateCentroid(d.geometry.coordinates[0]);
-        }
-        
-    } catch (error) {
-        console.warn("Error calculating centroid for Polygon:", error, d);
-        // If path.centroid fails (likely due to MultiPolygon), calculate for MultiPolygon
-        try {
-            centroid = calculateMultiPolygonCentroid(d.geometry.coordinates);
-        } catch (multiError) {
-            console.error("Error calculating centroid for MultiPolygon:", multiError, d);
-            centroid = [0, 0];  // Default to (0, 0) in case of failure
-        }
-    }
-
-    // Return the transformation
-    return `translate(${centroid[0] || 0}, ${centroid[1] || 0})`;
-});
-
-})
-);
-        }
-
-        // Setup the search bar and country list checkboxes
-        function setupCountryControls(geojson) {
-            const searchBar = d3.select("#search-bar");
-            const countryList = d3.select("#country-list");
-            const selectAllCheckbox = d3.select("#select-all");
-
-            // Populate the country list with checkboxes
-            geojson.features.forEach(country => {
-                const countryCode = country.id;
-                const countryName = country.properties.name;
-
-                const div = countryList.append("div").attr("class", "country-checkbox");
-                div.append("input")
-                    .attr("type", "checkbox")
-                    .attr("id", `checkbox-${countryCode}`)
-                    .attr("value", countryCode)
-                    .on("change", function() {
-                if (this.checked) {
-                    selectedCountries.push(countryCode);
-                    drawGlobe(geojson, currentYear,selectedCountries);
-                     // Add country to the selection
-                } else {
-                    selectedCountries = selectedCountries.filter(c => c !== countryCode);
-                    drawGlobe(geojson, currentYear,selectedCountries);
-                     // Remove from the selection
-                }
-            });
-                div.append("label").attr("for", `checkbox-${countryCode}`).text(countryName);
-            });
-
-            // Filter country list based on search input
-            searchBar.on("input", function() {
-                const query = this.value.toLowerCase();
-                countryList.selectAll(".country-checkbox").style("display", function() {
-                    const countryName = d3.select(this).select("label").text().toLowerCase();
-                    return countryName.includes(query) ? "block" : "none";
-                });
-            });
-
-            // Select or deselect all countries when the "Select All" checkbox is clicked
-            
-            selectAllCheckbox.on("click", function() {
-        const isChecked = this.checked;
-        selectedCountries = isChecked ? geojson.features.map(country => country.id) : []; // Clear the array and add all country codes if checked
-
-        // Set the checkboxes state based on "Select All"
-        countryList.selectAll("input[type='checkbox']")
-            .property("checked", isChecked); // Set all checkboxes to match the "Select All" checkbox state
-    }); }
-    function yearcontrol_globe(geojson){
-            const yearInput = d3.select("#year-input");
-                const playButton = d3.select("#play-button");
-
-                yearInput.on("change", function () {
-                    const enteredYear = +this.value;
-                    if (enteredYear >= 2000 && enteredYear <= 2020) {
-                        currentYear = enteredYear;
-                        rotating = false; // Stop rotation
-                        drawGlobe(geojson, currentYear, selectedCountries);
-                    } else {
-                        alert("Please enter a year between 2000 and 2020.");
-                        this.value = currentYear; // Reset input to the current year
-                    }
-                });
-                playButton.on("click", function () {
-                    rotating = true; // Resume rotation
-                    rotateGlobe(geojson, yearInput.node()); // Pass the updated input element
-                });}
-
-// Event Listener
-
 </script>
 </body>
 </html>

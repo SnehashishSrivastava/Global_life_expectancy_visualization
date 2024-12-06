@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customizable Chart with Year-Based Animation</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        #line-chart-container {
+            width: 900px;
+            height: 550px;
+            margin: auto;
+            position: relative;
+        }
+        .dropdown-container, .control-container {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            position: absolute;
+            width: 100%;
+            top: 0;
+            left: 0;
+            padding: 10px;
+        }
+        .control-container {
+            top: 50px;
+        }
+        .dropdown-container label, .control-container label {
+            font-size: 14px;
+            margin-right: 5px;
+        }
+        .dropdown, .control {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .legend-container {
+            width: 200px;
+            height: 550px;
+            overflow-y: auto;
+            position: absolute;
+            right: 10px;
+            top: 100px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            cursor: pointer;
+        }
+        .legend-circle {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .search-bar {
+            width: 90%;
+            margin-bottom: 10px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .select-all-btn, .control-btn {
+            margin-bottom: 10px;
+            padding: 5px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .select-all-btn:hover, .control-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div id="line-chart-container">
+        <div class="dropdown-container">
+            <div>
+                <label for="x-axis-dropdown">X Axis:</label>
+                <select class="dropdown" id="x-axis-dropdown">
+                    <option value="%vaccinated">Vaccination Rate</option>
+                    <option value="%gdpa">GDP Allocation</option>
+                    <option value="Year">Year</option>
+                </select>
+            </div>
+            <div>
+                <label for="y-axis-dropdown">Y Axis:</label>
+                <select class="dropdown" id="y-axis-dropdown">
+                    <option value="%gdpa">GDP Allocation</option>
+                    <option value="%vaccinated">Vaccination Rate</option>
+                    <option value="Year">Year</option>
+                </select>
+            </div>
+            <div>
+                <label for="size-dropdown">Ball Size:</label>
+                <select class="dropdown" id="size-dropdown">
+                    <option value="Life_expectancy">Life Expectancy</option>
+                    <option value="%vaccinated">Vaccination Rate</option>
+                    <option value="%gdpa">GDP Allocation</option>
+                </select>
+            </div>
+        </div>
+        <div class="control-container">
+            <button id="toggle-animation" class="control-btn">Stop Animation</button>
+            <label for="year-input">Year:</label>
+            <input id="year-input" class="control" type="number" min="2000" max="2020" step="1" value="2000">
+            <button id="set-year" class="control-btn">Set Year</button>
+        </div>
+    </div>
+    <div class="legend-container">
+        <button class="select-all-btn" id="select-all">Select All</button>
+        <input class="search-bar" id="legend-search" type="text" placeholder="Search countries...">
+    </div>
+    <div class="tooltip"></div>
+
+    <script>
+        const margin = { top: 60, right: 50, bottom: 50, left: 50 };
+        const width = 900 - margin.left - margin.right;
+        const height = 550 - margin.top - margin.bottom;
+
+        const xScale = d3.scaleLinear().range([0, width]);
+        const yScale = d3.scaleLinear().range([height, 0]);
+        const sizeScale = d3.scaleLinear().range([5, 20]);
+        const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+
+        const xAxisDropdown = document.getElementById("x-axis-dropdown");
+        const yAxisDropdown = document.getElementById("y-axis-dropdown");
+        const sizeDropdown = document.getElementById("size-dropdown");
+        const yearInput = document.getElementById("year-input");
+        const toggleAnimationButton = document.getElementById("toggle-animation");
+
+        let animationRunning = true;
+        let currentYear = 2000;
+
+        d3.csv('lifeexp.csv').then(function (data) {
+            data.forEach(d => {
+                d['Year'] = +d['Year'];
+                d['%vaccinated'] = +d['%vaccinated'];
+                d['%gdpa'] = +d['%gdpa'];
+                d['Life_expectancy'] = +d['Life_expectancy'];
+            });
+
+            const svg = d3.select("#line-chart-container")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const xAxisGroup = svg.append("g").attr("class", "x-axis").attr("transform", `translate(0,${height})`);
+            const yAxisGroup = svg.append("g").attr("class", "y-axis");
+
+            const tooltip = d3.select(".tooltip");
+            const legendContainer = d3.select(".legend-container");
+
+            const countries = Array.from(new Set(data.map(d => d.Entity)));
+            const hiddenCountries = new Set();
+
+            colorScale.domain(countries);
+
+            function updateScales() {
+                const xFeature = xAxisDropdown.value;
+                const yFeature = yAxisDropdown.value;
+                const sizeFeature = sizeDropdown.value;
+
+                xScale.domain(d3.extent(data, d => d[xFeature]));
+                yScale.domain(d3.extent(data, d => d[yFeature]));
+                sizeScale.domain(d3.extent(data, d => d[sizeFeature]));
+
+                xAxisGroup.call(d3.axisBottom(xScale).ticks(10));
+                yAxisGroup.call(d3.axisLeft(yScale).ticks(10));
+
+                renderChart(xFeature, yFeature, sizeFeature);
+            }
+
+            function renderChart(xFeature, yFeature, sizeFeature) {
+                svg.selectAll(".trail").remove();
+                svg.selectAll(".marks").remove();
+
+                countries.forEach(country => {
+                    if (!hiddenCountries.has(country)) {
+                        const countryData = data.filter(d => d.Entity === country).sort((a, b) => a.Year - b.Year);
+
+                        const trail = svg.append("g").attr("class", "trail");
+                        const marks = svg.append("g").attr("class", "marks");
+
+                        let yearIndex = countryData.findIndex(d => d.Year === currentYear);
+                        if (yearIndex === -1) yearIndex = 0;
+
+                        function animate() {
+                            if (!animationRunning) return;
+
+                            const currentData = countryData[yearIndex];
+                            const nextIndex = (yearIndex + 1) % countryData.length;
+                            const nextData = countryData[nextIndex];
+
+                            if (currentData && nextData) {
+                                const trail = svg.append("g").attr("class", "trail");
+
+                                trail.append("line")
+                                    .attr("x1", xScale(currentData[xFeature]))
+                                    .attr("y1", yScale(currentData[yFeature]))
+                                    .attr("x2", xScale(currentData[xFeature]))
+                                    .attr("y2", yScale(currentData[yFeature]))
+                                    .attr("stroke", colorScale(country))
+                                    .attr("stroke-width", sizeScale(currentData[sizeFeature]) / 2)
+                                    .style("stroke-opacity", 0)
+                                    .transition()
+                                    .duration(2000)
+                                    .ease(d3.easeCubicInOut)
+                                    .attr("x2", xScale(nextData[xFeature]))
+                                    .attr("y2", yScale(nextData[yFeature]));
+
+                                marks.selectAll("circle")
+                                    .data([nextData])
+                                    .join("circle")
+                                    .attr("r", d => sizeScale(d[sizeFeature]))
+                                    .style("fill", colorScale(country))
+                                    .attr("cx", xScale(currentData[xFeature]))
+                                    .attr("cy", yScale(currentData[yFeature]))
+                                    .on("mouseover", function (event, d) {
+                                        tooltip.style("display", "block")
+                                            .html(`
+                                                <strong>Country:</strong> ${country}<br>
+                                                <strong>Year:</strong> ${d.Year}<br>
+                                                <strong>Life Expectancy:</strong> ${d.Life_expectancy}<br>
+                                                <strong>% Vaccinated:</strong> ${d['%vaccinated']}<br>
+                                                <strong>% GDP:</strong> ${d['%gdpa']}
+                                            `)
+                                            .style("left", `${event.pageX + 10}px`)
+                                            .style("top", `${event.pageY + 10}px`);
+                                    })
+                                    .on("mouseout", () => tooltip.style("display", "none"))
+                                    .transition()
+                                    .duration(2000)
+                                    .ease(d3.easeCubicInOut)
+                                    .attr("cx", xScale(nextData[xFeature]))
+                                    .attr("cy", yScale(nextData[yFeature]));
+
+                                yearIndex = nextIndex;
+                                currentYear = nextData.Year;
+                                setTimeout(animate, 2000);
+                            }
+                        }
+
+                        animate();
+                    }
+                });
+            }
+
+            toggleAnimationButton.addEventListener("click", () => {
+                animationRunning = !animationRunning;
+                toggleAnimationButton.textContent = animationRunning ? "Stop Animation" : "Resume Animation";
+                if (animationRunning) {
+                    renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+                }
+            });
+
+            document.getElementById("set-year").addEventListener("click", () => {
+                const year = +yearInput.value;
+                if (year >= 2000 && year <= 2020) {
+                    currentYear = year;
+                    renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+                }
+            });
+
+            legendContainer.selectAll(".legend-item")
+                .data(countries)
+                .join("div")
+                .attr("class", "legend-item")
+                .html(d => `
+                    <div class="legend-circle" style="background:${colorScale(d)}"></div>
+                    <span>${d}</span>
+                `)
+                .on("click", function (event, country) {
+                    if (hiddenCountries.has(country)) {
+                        hiddenCountries.delete(country);
+                        d3.select(this).style("opacity", 1);
+                    } else {
+                        hiddenCountries.add(country);
+                        d3.select(this).style("opacity", 0.5);
+                    }
+                    updateScales();
+                });
+
+            d3.select("#select-all").on("click", function () {
+                if (hiddenCountries.size > 0) {
+                    hiddenCountries.clear();
+                    d3.selectAll(".legend-item").style("opacity", 1);
+                } else {
+                    countries.forEach(country => hiddenCountries.add(country));
+                    d3.selectAll(".legend-item").style("opacity", 0.5);
+                }
+                updateScales();
+            });
+
+            d3.select("#legend-search").on("input", function () {
+                const searchText = this.value.toLowerCase();
+                legendContainer.selectAll(".legend-item")
+                    .style("display", d => d.toLowerCase().includes(searchText) ? "flex" : "none");
+            });
+
+            xAxisDropdown.addEventListener("change", updateScales);
+            yAxisDropdown.addEventListener("change", updateScales);
+            sizeDropdown.addEventListener("change", updateScales);
+
+            updateScales();
+        });
+    </script>
+</body>
+</html>
