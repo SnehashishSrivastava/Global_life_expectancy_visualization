@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -144,6 +143,7 @@
         const width = 900 - margin.left - margin.right;
         const height = 550 - margin.top - margin.bottom;
         let isCollapsed = false;
+        let mouseOutTimeout;
 
         const xScale = d3.scaleLinear().range([0, width]);
         const yScale = d3.scaleLinear().range([height, 0]);
@@ -199,11 +199,71 @@
                 yAxisGroup.call(d3.axisLeft(yScale).ticks(10));
 
                 renderChart(xFeature, yFeature, sizeFeature);
+                // Implement Zoom and Drag
+const zoom = d3.zoom()
+    .scaleExtent([1, 10]) // Set zoom range
+    .translateExtent([[0, 0], [width + margin.right, height + margin.bottom]]) // Drag boundaries
+    .on("zoom", ({ transform }) => {
+        svg.select("g").attr("transform", transform); // Apply transformations to the chart group
+    });
+
+// Apply zoom to the SVG
+// Create a brush for area selection
+const brush = d3.brush()
+    .extent([[0, 0], [width, height]]) // Restrict brushing to the chart area
+    .on("end", brushed);
+
+// Add the brush to the SVG
+svg.append("g")
+    .attr("class", "brush")
+    .call(brush);
+
+function brushed(event) {
+    const selection = event.selection; // Get the selected area
+    if (!selection) return; // Do nothing if no area is selected
+
+    const [[x0, y0], [x1, y1]] = selection; // Extract coordinates of the selection
+
+    // Update scales to match the selected area
+    const xFeature = xAxisDropdown.value;
+    const yFeature = yAxisDropdown.value;
+    xScale.domain([xScale.invert(x0), xScale.invert(x1)]);
+    yScale.domain([yScale.invert(y1), yScale.invert(y0)]); // Invert y0 and y1 since y is reversed
+
+    // Update axes to reflect new scales
+    xAxisGroup.transition().duration(750).call(d3.axisBottom(xScale));
+    yAxisGroup.transition().duration(750).call(d3.axisLeft(yScale));
+
+    // Remove the brush and render the zoomed-in chart
+    svg.select(".brush").call(brush.move, null);
+    renderChart(xFeature, yFeature, sizeDropdown.value);
+}
+
+// Add a reset zoom button
+d3.select(".dropdown-container")
+    .append("button")
+    .attr("class", "control-btn")
+    .text("Reset Zoom")
+    .on("click", () => {
+        // Reset scales and axes to original values
+        xScale.domain(d3.extent(data, d => d[xAxisDropdown.value]));
+        yScale.domain(d3.extent(data, d => d[yAxisDropdown.value]));
+
+        xAxisGroup.transition().duration(750).call(d3.axisBottom(xScale));
+        yAxisGroup.transition().duration(750).call(d3.axisLeft(yScale));
+
+        renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+    });
+
             }
 
             function renderChart(xFeature, yFeature, sizeFeature) {
                 svg.selectAll(".trail").remove();
-                svg.selectAll(".marks").remove();
+                svg.selectAll(".circle").remove();
+                svg.selectAll(".mark").remove();
+
+                    const filteredData = data.filter(d => d.Year === currentYear && !hiddenCountries.has(d.Entity));
+
                 if (!isCollapsed){
                     svg.selectAll(".collapsed-circle").remove();
                 }
@@ -262,8 +322,10 @@ collapsedCircle
 
             // Update year and re-animate
             currentYear = currentYear < 2020 ? currentYear + 1 : 2000;
-            yearInput.value = currentYear; // Sync year input with animation
-            if (animationRunning) setTimeout(animateCollapsed, 1000); // Repeat animation
+            // yearInput.value = currentYear; // Sync year input with animation
+            if (animationRunning)
+            { yearInput.value = currentYear;
+                setTimeout(animateCollapsed, 5000);} // Repeat animation
         }
 
         animateCollapsed();
@@ -276,24 +338,41 @@ collapsedCircle
             .attr("r", 0)
             .remove();
     }
-
+    svg.selectAll(".trail").remove();
+                svg.selectAll(".circle").remove();
+                svg.selectAll(".mark").remove();
                 countries.forEach(country => {
                     if (!hiddenCountries.has(country)) {
-                        const countryData = data.filter(d => d.Entity === country).sort((a, b) => a.Year - b.Year);
+                        
+                            let countryData = data.filter(d => +d['Year'] === currentYear  && d.Entity === country);
+            //                 filter(d => +d['Year'] == year  && 
+            // (selectedCountries.length === 0 || selectedCountries.includes(d.Code))
+                            // const nodata=false
+
+                        console.log(country);
+                        
+                        // const countryData = data.filter(d => d.Entity === country).sort((a, b) => a.Year - b.Year);
 
                         const trail = svg.append("g").attr("class", "trail");
                         const marks = svg.append("g").attr("class", "marks");
 
-                        let yearIndex = countryData.findIndex(d => d.Year === currentYear);
-                        if (yearIndex === -1) yearIndex = 0;
+                        // let yearIndex = countryData.findIndex(d => d.Year === currentYear);
+                        // if (yearIndex === -1) yearIndex = 0;
 
                         function animate() {
+                            
                             if (!animationRunning) return;
 
-                            const currentData = countryData[yearIndex];
-                            const nextIndex = (yearIndex + 1) % countryData.length;
-                            const nextData = countryData[nextIndex];
-
+                            let currentData = countryData;
+                            // console.log(currentData);
+                            let nextYear = currentYear < 2020 ? currentYear + 1 : 2000;
+                            //  nextIndex = (yearIndex + 1) % countryData.length;
+                            
+                            let nextData = data.filter(d => +d['Year'] === nextYear  && d.Entity === country);
+                            // console.log(currentData[0][xFeature]);
+                            currentData=currentData[0];
+                            nextData=nextData[0];
+                            console.log(currentData,nextData);
                             if (currentData && nextData) {
                                 trail.append("line")
                                     .attr("x1", xScale(currentData[xFeature]))
@@ -337,23 +416,35 @@ collapsedCircle
                                             .style("left", `${event.pageX + 10}px`)
                                             .style("top", `${event.pageY + 10}px`);
                                     })
-                                    .on("mouseout", () => {
-                                        animationRunning = true;
+                                    .on("mouseout", () =>  {
                                         tooltip.style("display", "none");
-                                        currentYear=currentYear+1
+
+                                    if (mouseOutTimeout) return; // If a timeout is active, do nothing
+
+                                    mouseOutTimeout = setTimeout(() => {
+                                        mouseOutTimeout = null; // Reset the timeout after execution
+                                        animationRunning = true;
+                                        // currentYear=currentYear+1
                                         renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
-                            })
+                                        // Your logic for mouseout
+                                        tooltip.style("display", "none");
+                                        console.log("Mouse out logic executed after 2 seconds delay");
+                                    }, 2000); // 2-second delay
+                                })
                                     .transition()
                                     .duration(2000)
                                     .ease(d3.easeCubicInOut)
                                     .attr("cx", xScale(nextData[xFeature]))
-                                    .attr("cy", yScale(nextData[yFeature]));
+                                    .attr("cy", yScale(nextData[yFeature]))
+                                    .on("end", () => {
+                // After animations are done, update currentYear and restart
+                
+                yearInput.value = currentYear; 
+                currentYear = nextYear;// Sync input with animation
+                setTimeout(animate, 5000); // Wait before moving to the next frame
+            });
 
-                                yearIndex = nextIndex;
-                                currentYear = nextData.Year;
-                                
-                                setTimeout(animate, 2000);
-                                yearInput.value = currentYear;
+                            ;
                             }
                         }
 
@@ -426,6 +517,7 @@ collapsedCircle
 
             updateScales();
         });
+    
     </script>
 </body>
 </html>

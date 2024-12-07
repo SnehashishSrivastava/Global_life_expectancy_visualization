@@ -179,6 +179,16 @@
         <!-- <button id="applyfilters">Apply Filters</button> -->
     </div>
 
+    <!-- <div id="zoom-controls" style="position: absolute; top: 100px; left: 100px;">
+        <button id="zoom-in-button">+</button>
+        <button id="zoom-out-button">-</button>
+    </div> -->
+    <!-- <div id="zoom-controls" style="position: absolute; top: 150px; left: 150px;">
+        <button id="zoom-in-button" disabled>+</button>
+        <button id="zoom-out-button" disabled>-</button>
+    </div> -->
+    
+    
     <svg id="plot" width="960" height="600"></svg>
     
     <div id="year-controls">
@@ -188,12 +198,10 @@
 
     <!-- Tooltip container -->
     <div class="tooltip" id="tooltip" style="display: none;"></div>
-    <div id="view-toggle" style="position: absolute; top: 20px; right: 200px;">
-        <!-- <button id="toggle-view-button">Switch to Map View</button> -->
-    </div>
+    
     <script>
         // Set up the SVG and projection
-        const width = 800, height = 600;
+        const width = 1000, height = 600;
         const svg = d3.select("#plot")
             .attr("width", width)
             .attr("height", height);
@@ -266,6 +274,220 @@
 
             });
         });
+    
+        let pinPlaced = false;
+let pinLocation = null;
+let zoomLevel = 300; // Default zoom level
+const defaultZoomLevel = 300;
+
+// SVG group for the pin
+const pinGroup = svg.append("g").attr("class", "pin-group");
+
+// Function to update the globe projection based on the pin location
+function setProjectionToPin(pinLocation, zoomLevel) {
+    // Update the projection to focus on the pin location
+    projection.scale(zoomLevel).rotate([-pinLocation[0], -pinLocation[1]]);
+    // Redraw the globe and other elements
+    redrawGlobe();
+}
+
+// Function to redraw the globe
+function redrawGlobe() {
+    svg.selectAll("path").attr("d", path);
+
+    svg.selectAll(".bar-chart")
+        .attr("transform", d => {
+            const centroid = path.centroid(d);
+            return `translate(${centroid[0] || 0}, ${centroid[1] || 0})`;
+        })
+        .style("opacity", d => {
+            const centroid = path.centroid(d);
+            return isNaN(centroid[0]) || isNaN(centroid[1]) ? 0 : 1;
+        });
+}
+
+// Function to add or remove the pin
+function handlePinPlacement(event) {
+    const [x, y] = d3.pointer(event);
+    const coordinates = projection.invert([x, y]); // Convert screen coordinates to globe coordinates
+
+    if (!pinPlaced) {
+        pinPlaced = true;
+        pinLocation = coordinates;
+        svg.selectAll(".pin").remove();
+
+// Add a new pin at the clicked location
+svg.append("circle")
+    .attr("class", "pin")
+    .attr("cx", mouseX)
+    .attr("cy", mouseY)
+    .attr("r", 5)
+    .attr("fill", "red")
+    .attr("stroke", "black")
+    .attr("stroke-width", 1);
+        // Update the projection to focus on the pin
+        setProjectionToPin(pinLocation, zoomLevel);
+
+        // Add the pin visually
+        // svg.append("circle")
+        //         .attr("class", "pin")
+        //         .attr("cx", mouseX)
+        //         .attr("cy", mouseY)
+        //         .attr("r", 5)
+        //     .style("fill", "red")
+        //     .style("stroke", "black")
+        //     .style("stroke-width", 1.5);
+    svg.selectAll(".bar-chart").remove();
+
+        // Disable rotation
+        rotating = false;
+    } else {
+        // Remove the pin and reset the projection
+        pinPlaced = false;
+        pinLocation = null;
+        pinGroup.selectAll(".pin").remove();
+        projection.scale(defaultZoomLevel).rotate([0, 0]); // Reset projection
+        redrawGlobe();
+
+        // Enable rotation
+        rotating = true;
+    }
+}
+function addLCylinderLegend() {
+    const legendWidth = 300; // Total width of the legend
+    const legendHeight = 200; // Total height of the legend
+    const legendX = 20; // Position X
+    const legendY = height - legendHeight - 20; // Position Y
+
+    // Append the legend container
+    const legendGroup = svg.append("g")
+        .attr("class", "l-cylinder-legend")
+        .attr("transform", `translate(${legendX}, ${legendY})`);
+
+    // Add a background rectangle for the legend
+    legendGroup.append("rect")
+        .attr("width", legendWidth)
+        .attr("height", legendHeight)
+        .attr("fill", "#f9f9f9")
+        .attr("stroke", "#ccc")
+        .attr("rx", 10); // Rounded corners
+
+    // Add a title for the legend
+    legendGroup.append("text")
+        .attr("x", legendWidth / 2)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .style("font-size", "14px")
+        .style("font-weight", "bold")
+        .text("L-Shaped Cylinder Legend");
+
+    // Draw the horizontal base (GDP%)
+    legendGroup.append("line")
+        .attr("x1", 50)
+        .attr("y1", legendHeight - 30)
+        .attr("x2", 200)
+        .attr("y2", legendHeight - 30)
+        .attr("stroke", "#000")
+        .attr("stroke-width", 2);
+
+    legendGroup.append("text")
+        .attr("x", 125) // Center of the line
+        .attr("y", legendHeight - 10)
+        .attr("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text("GDP (%)");
+
+    // Draw the vertical height (Vaccination%)
+    legendGroup.append("line")
+        .attr("x1", 50)
+        .attr("y1", legendHeight - 30)
+        .attr("x2", 50)
+        .attr("y2", 30)
+        .attr("stroke", "#000")
+        .attr("stroke-width", 2);
+
+    legendGroup.append("text")
+        .attr("x", 20) // Position to the left
+        .attr("y", legendHeight / 2)
+        .attr("text-anchor", "middle")
+        .attr("transform", `rotate(-90, 20, ${legendHeight / 2})`) // Rotate for vertical alignment
+        .style("font-size", "12px")
+        .text("Vaccination (%)");
+
+    // Draw the cylinder in the gap
+    const cylinderX = 100; // Center of the cylinder
+    const baseRadius = 30; // Radius of the base
+    const cylinderHeight = 100; // Height of the cylinder
+
+    // Base ellipse (GDP%)
+    legendGroup.append("ellipse")
+        .attr("cx", cylinderX)
+        .attr("cy", legendHeight - 30) // Align with the base
+        .attr("rx", baseRadius)
+        .attr("ry", baseRadius / 2)
+        .attr("fill", "#1f77b4")
+        .style("opacity", 0.5);
+
+    // Cylinder body (Vaccination%)
+    legendGroup.append("rect")
+        .attr("x", cylinderX - baseRadius)
+        .attr("y", legendHeight - 30 - cylinderHeight)
+        .attr("width", baseRadius * 2)
+        .attr("height", cylinderHeight)
+        .attr("fill", "#ff7f0e")
+        .style("opacity", 0.5);
+
+    // Top ellipse
+    legendGroup.append("ellipse")
+        .attr("cx", cylinderX)
+        .attr("cy", legendHeight - 30 - cylinderHeight) // Align with the top
+        .attr("rx", baseRadius)
+        .attr("ry", baseRadius / 2)
+        .attr("fill", "#1f77b4")
+        .style("opacity", 0.5);
+}
+
+// Call the function after drawing the globe
+addLCylinderLegend();
+
+// Function to zoom in and out
+function zoomIn() {
+    if (pinPlaced && zoomLevel < 1000) {
+        svg.selectAll(".bar-chart").style("opacity",0);
+
+        zoomLevel += 50;
+        setProjectionToPin(pinLocation, zoomLevel);
+    }
+}
+
+function zoomOut() {
+    if (pinPlaced && zoomLevel > 150) {
+        zoomLevel -= 50;
+        setProjectionToPin(pinLocation, zoomLevel);
+    }
+}
+
+// Add event listener for pin placement (double-click to place/remove pin)
+// svg.on("dblclick", {handlePinPlacement});
+svg.on("dblclick", (event) => {handlePinPlacement(event);
+    svg.selectAll(".bar-chart").style("opacity",0);
+});
+
+// Add zoom in and zoom out buttons
+const buttonContainer = d3.select("body").append("div").attr("class", "button-container");
+
+buttonContainer
+    .append("button")
+    .text("+")
+    .on("click", zoomIn);
+
+buttonContainer
+    .append("button")
+    .text("-")
+    .on("click", zoomOut);
+
+// Function to redraw the globe and update paths
+
 function draw_run_globe(geojson, currentYear ,selectedCountries){
     drawGlobe(geojson, currentYear ,selectedCountries);
 
@@ -407,7 +629,7 @@ rotating = true;
             // .data(geojson.features.filter(d => selectedCountries.length==0 || selectedCountries.includes(d.id)))
             // .enter().append("g")
             // Add bar charts for %gdpa and %vaccinated on top of each country
-            if(cylinder){
+            
             svg.append("g").selectAll(".bar-chart")
             .data(geojson.features.filter(d => selectedCountries.length==0 || selectedCountries.includes(d.id)))
             .enter().append("g")
@@ -431,9 +653,9 @@ rotating = true;
                     const gdpaRadius = Math.max(0, gdpaScale(gdpa));  // Ensure non-negative height
                     const vaccinatedHeight = Math.max(0, vaccinationScale(vaccinated));
                     const growth=countryData[countryCode]?.growth
-                    const topColor = "#1f77b4";  // Blue for the top
+                    const topColor = "#ff7f0e";  // Blue for the top
                     const bodyColor = "#ff7f0e"; // Orange for the body
-                    const bottomColor = "#ff7f0e"; // Orange for the bottom
+                    const bottomColor = "#1f77b4"; // Orange for the bottom
             //         const gradient = svg.append("defs")
             // .append("linearGradient")
             // .attr("id", `gradient-${countryCode}`)
@@ -470,14 +692,15 @@ rotating = true;
             .attr("fill", bottomColor)
             .style("opacity",0.5);
     });
+    if(!cylinder) svg.selectAll(".bar-chart").style("opacity",0);
 
 };  
-    }
+    
 
         // Function to smoothly rotate the globe and change year after a full rotation
         function rotateGlobe(geojson, yearLabel) {
             d3.timer(function() {
-                if (rotating) {
+                if (rotating&&(!pinPlaced)) {
                     // Update the rotation angle
                     rotateAngle = (rotateAngle + rotationSpeed) % 360; // Ensure it stays within 0-360 degrees
                     projection.rotate([rotateAngle, 0]);
@@ -498,7 +721,7 @@ rotating = true;
     return isNaN(centroid[0]) || isNaN(centroid[1]) ? 0 : 1;
 });}
 if(!cylinder){
-    svg.selectAll(".bar-chart").remove();
+    svg.selectAll(".bar-chart").style("opacity" ,0);
 
 }
 
@@ -533,8 +756,9 @@ if(!cylinder){
 
     return [cx, cy];
 }
-    function addLegend() {
-    const legendWidth = 200, legendHeight = 10;
+   function addLegend() {
+    const legendWidth = 20, // Narrow width for vertical bar
+          legendHeight = 200; // Height for vertical bar
 
     // Create the defs for the gradient
     const defs = svg.append("defs");
@@ -542,8 +766,8 @@ if(!cylinder){
     const gradient = defs.append("linearGradient")
         .attr("id", "legend-gradient")
         .attr("x1", "0%")
-        .attr("y1", "0%")
-        .attr("x2", "100%")
+        .attr("y1", "100%") // Make the gradient vertical
+        .attr("x2", "0%")
         .attr("y2", "0%");
 
     // Define stops for the gradient
@@ -557,10 +781,10 @@ if(!cylinder){
             .attr("stop-color", colorScale(colorDomain[0] + i * rangeStep));
     }
 
-    // Append the legend group
+    // Append the legend group outside the globe
     const legendSvg = svg.append("g")
         .attr("class", "legend")
-        .attr("transform", `translate(${width - legendWidth - 50}, 100)`);
+        .attr("transform", `translate(${width - 100}, ${height / 3})`); // Move to the right side
 
     // Draw the rectangle filled with the gradient
     legendSvg.append("rect")
@@ -576,25 +800,23 @@ if(!cylinder){
         .attr("x", legendWidth / 2)
         .attr("y", -10)
         .style("text-anchor", "middle")
-        .text("Life Expectency");
+        .text("Life Expectancy");
 
     // Set up the scale for the axis
     const legendScale = d3.scaleLinear()
-        .range([0, legendWidth])
+        .range([legendHeight, 0]) // Invert range for vertical orientation
         .domain(colorDomain);
 
     // Define and append the axis
-    const legendAxis = d3.axisBottom(legendScale)
+    const legendAxis = d3.axisRight(legendScale) // Right-oriented vertical axis
         .tickFormat(d3.format(".0f"))
         .ticks(6);
 
     legendSvg.append("g")
         .attr("class", "legend-axis")
-        .attr("transform", `translate(0, ${legendHeight})`)
+        .attr("transform", `translate(${legendWidth}, 0)`) // Position the axis to the right of the gradient bar
         .call(legendAxis);
 }
-
-        
 
         // Function to enable dragging interaction for the globe
 function enableDragging() {
@@ -716,48 +938,48 @@ function enableDragging() {
                     rotateGlobe(geojson, yearInput.node()); // Pass the updated input element
                 });
             };
-function fisheyeProjection(baseProjection, focus, strength, radius) {
-    return {
-        stream: function (stream) {
-            const baseStream = baseProjection.stream(stream);
-            return {
-                point: function (x, y) {
-                    const dx = x - focus[0];
-                    const dy = y - focus[1];
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+// function fisheyeProjection(baseProjection, focus, strength, radius) {
+//     return {
+//         stream: function (stream) {
+//             const baseStream = baseProjection.stream(stream);
+//             return {
+//                 point: function (x, y) {
+//                     const dx = x - focus[0];
+//                     const dy = y - focus[1];
+//                     const distance = Math.sqrt(dx * dx + dy * dy);
 
-                    if (distance < radius) {
-                        const scale = 1 + strength * (1 - distance / radius);
-                        const distortedX = focus[0] + dx * scale;
-                        const distortedY = focus[1] + dy * scale;
-                        baseStream.point(distortedX, distortedY);
-                    } else {
-                        baseStream.point(x, y);
-                    }
-                },
-                sphere: baseStream.sphere,
-                lineStart: baseStream.lineStart,
-                lineEnd: baseStream.lineEnd,
-                polygonStart: baseStream.polygonStart,
-                polygonEnd: baseStream.polygonEnd,
-            };
-        },
-    };
-}
-function fisheyeDistortion(x, y, focusX, focusY, strength, radius) {
-    const dx = x - focusX;
-    const dy = y - focusY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+//                     if (distance < radius) {
+//                         const scale = 1 + strength * (1 - distance / radius);
+//                         const distortedX = focus[0] + dx * scale;
+//                         const distortedY = focus[1] + dy * scale;
+//                         baseStream.point(distortedX, distortedY);
+//                     } else {
+//                         baseStream.point(x, y);
+//                     }
+//                 },
+//                 sphere: baseStream.sphere,
+//                 lineStart: baseStream.lineStart,
+//                 lineEnd: baseStream.lineEnd,
+//                 polygonStart: baseStream.polygonStart,
+//                 polygonEnd: baseStream.polygonEnd,
+//             };
+//         },
+//     };
+// }
+// function fisheyeDistortion(x, y, focusX, focusY, strength, radius) {
+//     const dx = x - focusX;
+//     const dy = y - focusY;
+//     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    if (distance < radius) {
-        const distortion = (1 - distance / radius) * strength;
-        return [
-            focusX + dx * (1 + distortion),
-            focusY + dy * (1 + distortion),
-        ];
-    }
-    return [x, y];
-}
+//     if (distance < radius) {
+//         const distortion = (1 - distance / radius) * strength;
+//         return [
+//             focusX + dx * (1 + distortion),
+//             focusY + dy * (1 + distortion),
+//         ];
+//     }
+//     return [x, y];
+// }
 
     </script>
 </body>
