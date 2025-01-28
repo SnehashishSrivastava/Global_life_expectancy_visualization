@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Customizable Chart with Year-Based Animation</title>
+  <title>Scatter Plot with Animation</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
     body {
@@ -127,7 +127,7 @@
           <option value="Life_expectancy">Life Expectancy</option>
         </select>
       </div>
-      <!-- Single Reset Zoom button (never appended again). -->
+      
       <button class="control-btn" id="reset-zoom">Reset Zoom</button>
     </div>
     <div class="control-container">
@@ -167,7 +167,6 @@
     let animationRunning = true;
     let currentYear = 2000;
 
-    // We'll store normal-mode & collapsed-mode timeouts so we can clear them if toggled
     let normalModeTimeout = null;
     let collapsedModeTimeout = null;
 
@@ -261,7 +260,7 @@
             hiddenCountries.add(country);
             d3.select(this).style("opacity", 0.5);
           }
-          initScales(); // re-scale, re-render
+          initScales();
         });
 
       d3.select("#select-all").on("click", () => {
@@ -291,7 +290,6 @@
       toggleCollapseButton.addEventListener("click", () => {
         isCollapsed = !isCollapsed;
 
-        // Clear any pending normal or collapsed timeouts
         if (normalModeTimeout) {
           clearTimeout(normalModeTimeout);
           normalModeTimeout = null;
@@ -311,7 +309,7 @@
           ? "Stop Animation"
           : "Resume Animation";
 
-        // Clear any leftover timeouts if stopping
+        
         if (!animationRunning) {
           if (normalModeTimeout) {
             clearTimeout(normalModeTimeout);
@@ -322,7 +320,7 @@
             collapsedModeTimeout = null;
           }
         } else {
-          // if resuming, just re-render
+          
           renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
         }
       });
@@ -456,7 +454,6 @@
               });
           }
 
-          // circle
           let circle = marks
             .append("circle")
             .attr("class", "circle")
@@ -480,7 +477,7 @@
             })
             .on("mouseout", () => {
               tooltip.style("display", "none");
-              animationRunning = true; // re-enable animation
+              animationRunning = true;
             });
 
           if (!nData) {
@@ -489,7 +486,6 @@
             return;
           }
 
-          // Animate from cData => nData
           circle
             .transition()
             .duration(2000)
@@ -508,12 +504,10 @@
       });
     }
 
-    // We'll store timeouts for normal mode vs collapsed
     function finalizeYearStep(nextYear){
       currentYear = nextYear;
       yearInput.value = currentYear;
-      if(animationRunning && !isCollapsed){ // Only continue normal mode if not collapsed
-        // Clear old normalModeTimeout before setting a new one
+      if(animationRunning && !isCollapsed){ 
         if (normalModeTimeout) {
           clearTimeout(normalModeTimeout);
         }
@@ -584,7 +578,6 @@
       currentYear = currentYear < 2020 ? currentYear + 1 : 2000;
       yearInput.value = currentYear;
       if (animationRunning && isCollapsed) {
-        // Clear old collapsedModeTimeout before setting a new one
         if (collapsedModeTimeout) {
           clearTimeout(collapsedModeTimeout);
         }
