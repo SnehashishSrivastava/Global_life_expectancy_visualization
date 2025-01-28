@@ -1,523 +1,598 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customizable Chart with Year-Based Animation</title>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-        #line-chart-container {
-            width: 900px;
-            height: 550px;
-            margin: auto;
-            position: relative;
-        }
-        .dropdown-container, .control-container {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            position: absolute;
-            width: 100%;
-            top: 0;
-            left: 0;
-            padding: 10px;
-        }
-        .control-container {
-            top: 50px;
-        }
-        .dropdown-container label, .control-container label {
-            font-size: 14px;
-            margin-right: 5px;
-        }
-        .dropdown, .control {
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        .tooltip {
-            position: absolute;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            display: none;
-            pointer-events: none;
-            z-index: 10;
-        }
-        .legend-container {
-            width: 200px;
-            height: 550px;
-            overflow-y: auto;
-            position: absolute;
-            right: 10px;
-            top: 100px;
-            background: #f9f9f9;
-            border: 1px solid #ddd;
-            padding: 10px;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-            cursor: pointer;
-        }
-        .legend-circle {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
-        .search-bar {
-            width: 90%;
-            margin-bottom: 10px;
-            padding: 5px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        .select-all-btn, .control-btn {
-            margin-bottom: 10px;
-            padding: 5px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .select-all-btn:hover, .control-btn:hover {
-            background-color: #0056b3;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Customizable Chart with Year-Based Animation</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    #line-chart-container {
+      width: 900px;
+      height: 550px;
+      margin: auto;
+      position: relative;
+    }
+    .dropdown-container,
+    .control-container {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      position: absolute;
+      width: 100%;
+      top: 0;
+      left: 0;
+      padding: 10px;
+    }
+    .control-container {
+      top: 50px;
+    }
+    .dropdown-container label,
+    .control-container label {
+      font-size: 14px;
+      margin-right: 5px;
+    }
+    .dropdown,
+    .control {
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    .tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      display: none;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .legend-container {
+      width: 200px;
+      height: 550px;
+      overflow-y: auto;
+      position: absolute;
+      right: 10px;
+      top: 100px;
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+      cursor: pointer;
+    }
+    .legend-circle {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+    .search-bar {
+      width: 90%;
+      margin-bottom: 10px;
+      padding: 5px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    .select-all-btn,
+    .control-btn {
+      margin-bottom: 10px;
+      padding: 5px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .select-all-btn:hover,
+    .control-btn:hover {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
 <body>
-    <div id="line-chart-container">
-        <div class="dropdown-container">
-           
-            <div>
-                <label for="y-axis-dropdown">Y Axis:</label>
-                <select class="dropdown" id="y-axis-dropdown">
-                    <option value="Life_expectancy">Life Expectancy</option>
-                    <option value="%gdpa">GDP Allocation</option>
-                    <option value="%vaccinated">Vaccination Rate</option>
-                    <option value="Year">Year</option>
-                </select>
-            </div>
-            <div>
-                <label for="x-axis-dropdown">X Axis:</label>
-                <select class="dropdown" id="x-axis-dropdown">
-                    <option value="%vaccinated">Vaccination Rate</option>
-                    <option value="Life_expectancy">Life Expectancy</option>
-                    <option value="%gdpa">GDP Allocation</option>
-                    <option value="Year">Year</option>
-                </select>
-            </div>
-            <div>
-                <label for="size-dropdown">Ball Size:</label>
-                <select class="dropdown" id="size-dropdown">
-                    <option value="%gdpa">GDP Allocation</option>
-                    <option value="%vaccinated">Vaccination Rate</option>
-                    <option value="Life_expectancy">Life Expectancy</option>                    
-                </select>
-            </div>
-        </div>
-        <div class="control-container">
-            <button id="toggle-animation" class="control-btn">Stop Animation</button>
-            <label for="year-input">Year:</label>
-            <input id="year-input" class="control" type="number" min="2000" max="2020" step="1" value="2000">
-            <button id="set-year" class="control-btn">Set Year</button>
-            <button id="toggle-collapse" class="control-btn">Collapse</button>
-        </div>
+  <div id="line-chart-container">
+    <div class="dropdown-container">
+      <div>
+        <label for="y-axis-dropdown">Y Axis:</label>
+        <select class="dropdown" id="y-axis-dropdown">
+          <option value="Life_expectancy">Life Expectancy</option>
+          <option value="%gdpa">GDP Allocation</option>
+          <option value="%vaccinated">Vaccination Rate</option>
+          <option value="Year">Year</option>
+        </select>
+      </div>
+      <div>
+        <label for="x-axis-dropdown">X Axis:</label>
+        <select class="dropdown" id="x-axis-dropdown">
+          <option value="%vaccinated">Vaccination Rate</option>
+          <option value="Life_expectancy">Life Expectancy</option>
+          <option value="%gdpa">GDP Allocation</option>
+          <option value="Year">Year</option>
+        </select>
+      </div>
+      <div>
+        <label for="size-dropdown">Ball Size:</label>
+        <select class="dropdown" id="size-dropdown">
+          <option value="%gdpa">GDP Allocation</option>
+          <option value="%vaccinated">Vaccination Rate</option>
+          <option value="Life_expectancy">Life Expectancy</option>
+        </select>
+      </div>
+      <!-- Single Reset Zoom button (never appended again). -->
+      <button class="control-btn" id="reset-zoom">Reset Zoom</button>
     </div>
-    <div class="legend-container">
-        <button class="select-all-btn" id="select-all">Select All</button>
-        <input class="search-bar" id="legend-search" type="text" placeholder="Search countries...">
+    <div class="control-container">
+      <button id="toggle-animation" class="control-btn">Stop Animation</button>
+      <label for="year-input">Year:</label>
+      <input
+        id="year-input"
+        class="control"
+        type="number"
+        min="2000"
+        max="2020"
+        step="1"
+        value="2000"
+      />
+      <button id="set-year" class="control-btn">Set Year</button>
+      <button id="toggle-collapse" class="control-btn">Collapse</button>
     </div>
-    <div class="tooltip"></div>
+  </div>
+  <div class="legend-container">
+    <button class="select-all-btn" id="select-all">Select All</button>
+    <input
+      class="search-bar"
+      id="legend-search"
+      type="text"
+      placeholder="Search countries..."
+    />
+  </div>
+  <div class="tooltip"></div>
 
-    <script>
-        const margin = { top: 100, right: 100, bottom: 50, left: 50 };
-        const width = 900 - margin.left - margin.right;
-        const height = 550 - margin.top - margin.bottom;
-        let isCollapsed = false;
-        let mouseOutTimeout;
+  <script>
+    const margin = { top: 100, right: 100, bottom: 50, left: 50 };
+    const width = 900 - margin.left - margin.right;
+    const height = 550 - margin.top - margin.bottom;
 
-        const xScale = d3.scaleLinear().range([0, width]);
-        const yScale = d3.scaleLinear().range([height, 0]);
-        const sizeScale = d3.scaleLinear().range([5, 20]);
-        const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    let isCollapsed = false;
+    let mouseOutTimeout;
+    let animationRunning = true;
+    let currentYear = 2000;
 
-        const xAxisDropdown = document.getElementById("x-axis-dropdown");
-        const yAxisDropdown = document.getElementById("y-axis-dropdown");
-        const sizeDropdown = document.getElementById("size-dropdown");
-        const yearInput = document.getElementById("year-input");
-        const toggleAnimationButton = document.getElementById("toggle-animation");
-        const toggleCollapseButton = document.getElementById("toggle-collapse");
+    // We'll store normal-mode & collapsed-mode timeouts so we can clear them if toggled
+    let normalModeTimeout = null;
+    let collapsedModeTimeout = null;
 
-        let animationRunning = true;
-        let currentYear = 2000;
+    const xScale = d3.scaleLinear().range([0, width]);
+    const yScale = d3.scaleLinear().range([height, 0]);
+    const sizeScale = d3.scaleLinear().range([5, 20]);
+    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
 
-        d3.csv('lifeexp.csv').then(function (data) {
-            data.forEach(d => {
-                d['Year'] = +d['Year'];
-                d['%vaccinated'] = +d['%vaccinated'];
-                d['%gdpa'] = +d['%gdpa'];
-                d['Life_expectancy'] = +d['Life_expectancy'];
-            });
+    const xAxisDropdown = document.getElementById("x-axis-dropdown");
+    const yAxisDropdown = document.getElementById("y-axis-dropdown");
+    const sizeDropdown = document.getElementById("size-dropdown");
+    const yearInput = document.getElementById("year-input");
+    const toggleAnimationButton = document.getElementById("toggle-animation");
+    const toggleCollapseButton = document.getElementById("toggle-collapse");
+    const resetZoomButton = document.getElementById("reset-zoom");
 
-            const svg = d3.select("#line-chart-container")
-                .append("svg")
-                .attr("width", width + margin.left + margin.right)
-                .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                .attr("transform", `translate(${margin.left},${margin.top})`);
+    let svg, xAxisGroup, yAxisGroup, tooltip, legendContainer;
+    let countries, hiddenCountries, dataSet;
 
-            const xAxisGroup = svg.append("g").attr("class", "x-axis").attr("transform", `translate(0,${height})`);
-            const yAxisGroup = svg.append("g").attr("class", "y-axis");
+    let zoom, brush;
 
-            const tooltip = d3.select(".tooltip");
-            const legendContainer = d3.select(".legend-container");
+    d3.csv("lifeexp.csv").then(function (data) {
+      dataSet = data;
+      dataSet.forEach((d) => {
+        d.Year = +d.Year;
+        d["%vaccinated"] = +d["%vaccinated"];
+        d["%gdpa"] = +d["%gdpa"];
+        d.Life_expectancy = +d.Life_expectancy;
+      });
 
-            const countries = Array.from(new Set(data.map(d => d.Entity)));
-            const hiddenCountries = new Set();
+      svg = d3
+        .select("#line-chart-container")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
 
-            colorScale.domain(countries);
+      xAxisGroup = svg.append("g")
+        .attr("class", "x-axis")
+        .attr("transform", `translate(0,${height})`);
 
-            function updateScales() {
-                const xFeature = xAxisDropdown.value;
-                const yFeature = yAxisDropdown.value;
-                const sizeFeature = sizeDropdown.value;
+      yAxisGroup = svg.append("g")
+        .attr("class", "y-axis");
 
-                xScale.domain(d3.extent(data, d => d[xFeature]));
-                yScale.domain(d3.extent(data, d => d[yFeature]));
-                sizeScale.domain(d3.extent(data, d => d[sizeFeature]));
+      tooltip = d3.select(".tooltip");
+      legendContainer = d3.select(".legend-container");
 
-                xAxisGroup.call(d3.axisBottom(xScale).ticks(10));
-                yAxisGroup.call(d3.axisLeft(yScale).ticks(10));
+      countries = Array.from(new Set(dataSet.map((d) => d.Entity)));
+      hiddenCountries = new Set();
+      colorScale.domain(countries);
 
-                renderChart(xFeature, yFeature, sizeFeature);
-                // Implement Zoom and Drag
-const zoom = d3.zoom()
-    .scaleExtent([1, 10]) // Set zoom range
-    .translateExtent([[0, 0], [width + margin.right, height + margin.bottom]]) // Drag boundaries
-    .on("zoom", ({ transform }) => {
-        svg.select("g").attr("transform", transform); // Apply transformations to the chart group
+      initScales(); 
+      initLegend();
+      initControls();
+      initZoomBrush();
     });
 
-// Apply zoom to the SVG
-// Create a brush for area selection
-const brush = d3.brush()
-    .extent([[0, 0], [width, height]]) // Restrict brushing to the chart area
-    .on("end", brushed);
+    function initScales() {
+      const xFeature = xAxisDropdown.value;
+      const yFeature = yAxisDropdown.value;
+      const sizeFeature = sizeDropdown.value;
 
-// Add the brush to the SVG
-svg.append("g")
-    .attr("class", "brush")
-    .call(brush);
+      xScale.domain(d3.extent(dataSet, (d) => d[xFeature]));
+      yScale.domain(d3.extent(dataSet, (d) => d[yFeature]));
+      sizeScale.domain(d3.extent(dataSet, (d) => d[sizeFeature]));
 
-function brushed(event) {
-    const selection = event.selection; // Get the selected area
-    if (!selection) return; // Do nothing if no area is selected
+      xAxisGroup.call(d3.axisBottom(xScale).ticks(10));
+      yAxisGroup.call(d3.axisLeft(yScale).ticks(10));
 
-    const [[x0, y0], [x1, y1]] = selection; // Extract coordinates of the selection
-
-    // Update scales to match the selected area
-    const xFeature = xAxisDropdown.value;
-    const yFeature = yAxisDropdown.value;
-    xScale.domain([xScale.invert(x0), xScale.invert(x1)]);
-    yScale.domain([yScale.invert(y1), yScale.invert(y0)]); // Invert y0 and y1 since y is reversed
-
-    // Update axes to reflect new scales
-    xAxisGroup.transition().duration(750).call(d3.axisBottom(xScale));
-    yAxisGroup.transition().duration(750).call(d3.axisLeft(yScale));
-
-    // Remove the brush and render the zoomed-in chart
-    svg.select(".brush").call(brush.move, null);
-    renderChart(xFeature, yFeature, sizeDropdown.value);
-}
-
-// Add a reset zoom button
-d3.select(".dropdown-container")
-    .append("button")
-    .attr("class", "control-btn")
-    .text("Reset Zoom")
-    .on("click", () => {
-        // Reset scales and axes to original values
-        xScale.domain(d3.extent(data, d => d[xAxisDropdown.value]));
-        yScale.domain(d3.extent(data, d => d[yAxisDropdown.value]));
-
-        xAxisGroup.transition().duration(750).call(d3.axisBottom(xScale));
-        yAxisGroup.transition().duration(750).call(d3.axisLeft(yScale));
-
-        renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
-    });
-
-            }
-
-            function renderChart(xFeature, yFeature, sizeFeature) {
-                svg.selectAll(".trail").remove();
-                svg.selectAll(".circle").remove();
-                svg.selectAll(".mark").remove();
-
-                    const filteredData = data.filter(d => d.Year === currentYear && !hiddenCountries.has(d.Entity));
-
-                if (!isCollapsed){
-                    svg.selectAll(".collapsed-circle").remove();
-                }
-                if (isCollapsed) {
-        // Calculate averages for the collapsed state
-        function animateCollapsed() {
-            const visibleData = data.filter(d => !hiddenCountries.has(d.Entity) && d.Year === currentYear);
-
-            if (visibleData.length > 0) {
-                const avgX = d3.mean(visibleData, d => d[xFeature]);
-                const avgY = d3.mean(visibleData, d => d[yFeature]);
-                const avgSize = d3.mean(visibleData, d => d[sizeFeature]);
-
-                svg.selectAll(".collapsed-circle")
-    .data([1]) // Single collapsed ball
-    .join("circle")
-    .attr("class", "collapsed-circle")
-    .transition()
-    .duration(1000)
-    .attr("cx", xScale(avgX))
-    .attr("cy", yScale(avgY))
-    .attr("r", sizeScale(avgSize))
-    .style("fill", "gray")
-    .style("opacity", 0.7);
-
-// Select the collapsed circle after it has been drawn
-let collapsedCircle = svg.selectAll(".collapsed-circle");
-
-// Add mouseover and mouseout events
-collapsedCircle
-    .on("mouseover", function (event) {
-        d3.select(this) // Select the hovered element
-            .transition()
-            .duration(200)
-            .attr("r", sizeScale(avgSize) * 1.2); // Enlarge the circle by 20%
-        tooltip.style("display", "block")
-            .html(`
-                <strong>${xFeature}:</strong> ${avgX.toFixed(2)}<br>
-                <strong>Year:</strong> ${currentYear}<br>
-                <strong>${yFeature}:</strong> ${avgY.toFixed(2)}<br>
-                <strong>${sizeFeature}:</strong> ${avgSize.toFixed(2)}
-            `)
-            .style("left", `${event.pageX + 10}px`)
-            .style("top", `${event.pageY + 10}px`);
-    })
-    .on("mouseout", function () {
-        d3.select(this) // Select the hovered element
-            .transition()
-            .duration(200)
-            .attr("r", sizeScale(avgSize)); // Reset the circle size
-        tooltip.style("display", "none");
-    });
-
+      renderChart(xFeature, yFeature, sizeFeature);
     }
 
+    function initLegend() {
+      legendContainer
+        .selectAll(".legend-item")
+        .data(countries)
+        .join("div")
+        .attr("class", "legend-item")
+        .html(
+          (d) => `
+          <div class="legend-circle" style="background:${colorScale(d)}"></div>
+          <span>${d}</span>
+        `
+        )
+        .on("click", function (event, country) {
+          if (hiddenCountries.has(country)) {
+            hiddenCountries.delete(country);
+            d3.select(this).style("opacity", 1);
+          } else {
+            hiddenCountries.add(country);
+            d3.select(this).style("opacity", 0.5);
+          }
+          initScales(); // re-scale, re-render
+        });
 
-            // Update year and re-animate
-            currentYear = currentYear < 2020 ? currentYear + 1 : 2000;
-            // yearInput.value = currentYear; // Sync year input with animation
-            if (animationRunning)
-            { yearInput.value = currentYear;
-                setTimeout(animateCollapsed, 5000);} // Repeat animation
+      d3.select("#select-all").on("click", () => {
+        if (hiddenCountries.size > 0) {
+          hiddenCountries.clear();
+          d3.selectAll(".legend-item").style("opacity", 1);
+        } else {
+          countries.forEach((country) => hiddenCountries.add(country));
+          d3.selectAll(".legend-item").style("opacity", 0.5);
+        }
+        initScales();
+      });
+
+      d3.select("#legend-search").on("input", function () {
+        const searchText = this.value.toLowerCase();
+        legendContainer.selectAll(".legend-item").style("display", (d) =>
+          d.toLowerCase().includes(searchText) ? "flex" : "none"
+        );
+      });
+    }
+
+    function initControls() {
+      xAxisDropdown.addEventListener("change", initScales);
+      yAxisDropdown.addEventListener("change", initScales);
+      sizeDropdown.addEventListener("change", initScales);
+
+      toggleCollapseButton.addEventListener("click", () => {
+        isCollapsed = !isCollapsed;
+
+        // Clear any pending normal or collapsed timeouts
+        if (normalModeTimeout) {
+          clearTimeout(normalModeTimeout);
+          normalModeTimeout = null;
+        }
+        if (collapsedModeTimeout) {
+          clearTimeout(collapsedModeTimeout);
+          collapsedModeTimeout = null;
         }
 
-        animateCollapsed();
-        return; // Skip rendering individual circles
-    } else {
-        // Remove the collapsed circle when expanding back
-        svg.selectAll(".collapsed-circle")
-            .transition()
-            .duration(1000)
-            .attr("r", 0)
-            .remove();
+        toggleCollapseButton.textContent = isCollapsed ? "Expand" : "Collapse";
+        renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+      });
+
+      toggleAnimationButton.addEventListener("click", () => {
+        animationRunning = !animationRunning;
+        toggleAnimationButton.textContent = animationRunning
+          ? "Stop Animation"
+          : "Resume Animation";
+
+        // Clear any leftover timeouts if stopping
+        if (!animationRunning) {
+          if (normalModeTimeout) {
+            clearTimeout(normalModeTimeout);
+            normalModeTimeout = null;
+          }
+          if (collapsedModeTimeout) {
+            clearTimeout(collapsedModeTimeout);
+            collapsedModeTimeout = null;
+          }
+        } else {
+          // if resuming, just re-render
+          renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+        }
+      });
+
+      document.getElementById("set-year").addEventListener("click", () => {
+        const year = +yearInput.value;
+        if (year >= 2000 && year <= 2020) {
+          currentYear = year;
+          renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
+        }
+      });
+
+      resetZoomButton.addEventListener("click", () => {
+        const xFeature = xAxisDropdown.value;
+        const yFeature = yAxisDropdown.value;
+
+        xScale.domain(d3.extent(dataSet, (d) => d[xFeature]));
+        yScale.domain(d3.extent(dataSet, (d) => d[yFeature]));
+
+        xAxisGroup.transition().duration(500).call(d3.axisBottom(xScale));
+        yAxisGroup.transition().duration(500).call(d3.axisLeft(yScale));
+
+        renderChart(xFeature, yFeature, sizeDropdown.value);
+      });
     }
-    svg.selectAll(".trail").remove();
-                svg.selectAll(".circle").remove();
-                svg.selectAll(".mark").remove();
-                countries.forEach(country => {
-                    if (!hiddenCountries.has(country)) {
-                        
-                            let countryData = data.filter(d => +d['Year'] === currentYear  && d.Entity === country);
-            //                 filter(d => +d['Year'] == year  && 
-            // (selectedCountries.length === 0 || selectedCountries.includes(d.Code))
-                            // const nodata=false
 
-                        console.log(country);
-                        
-                        // const countryData = data.filter(d => d.Entity === country).sort((a, b) => a.Year - b.Year);
-
-                        const trail = svg.append("g").attr("class", "trail");
-                        const marks = svg.append("g").attr("class", "marks");
-
-                        // let yearIndex = countryData.findIndex(d => d.Year === currentYear);
-                        // if (yearIndex === -1) yearIndex = 0;
-
-                        function animate() {
-                            
-                            if (!animationRunning) return;
-
-                            let currentData = countryData;
-                            // console.log(currentData);
-                            let nextYear = currentYear < 2020 ? currentYear + 1 : 2000;
-                            //  nextIndex = (yearIndex + 1) % countryData.length;
-                            
-                            let nextData = data.filter(d => +d['Year'] === nextYear  && d.Entity === country);
-                            // console.log(currentData[0][xFeature]);
-                            currentData=currentData[0];
-                            nextData=nextData[0];
-                            console.log(currentData,nextData);
-                            if (currentData && nextData) {
-                                trail.append("line")
-                                    .attr("x1", xScale(currentData[xFeature]))
-                                    .attr("y1", yScale(currentData[yFeature]))
-                                    .attr("x2", xScale(currentData[xFeature]))
-                                    .attr("y2", yScale(currentData[yFeature]))
-                                    .attr("stroke", colorScale(country))
-                                    .attr("stroke-width", sizeScale(currentData[sizeFeature]) )
-                                    .style("stroke-opacity", 0.3)
-                                    .transition()
-                                    .duration(2000)
-                                    .ease(d3.easeCubicInOut)
-                                    .attr("x2", xScale(nextData[xFeature]))
-                                    .attr("y2", yScale(nextData[yFeature]))
-                                    .on("end", function () {
-        // After the first animation, make the trail disappear
-        d3.select(this)
-            .transition()
-            .duration(1000) // 1 second duration
-            .style("stroke-opacity", 0) // Fade out
-            .remove(); // Remove the line after fading out
-    });
-
-                                marks.selectAll("circle")
-                                    .data([nextData])
-                                    .join("circle")
-                                    .attr("r", d => sizeScale(d[sizeFeature]))
-                                    .style("fill", colorScale(country))
-                                    .attr("cx", xScale(currentData[xFeature]))
-                                    .attr("cy", yScale(currentData[yFeature]))
-                                    .on("mouseover", function (event, d) {
-                                        animationRunning = false;
-                                        tooltip.style("display", "block")
-                                            .html(`
-                                                <strong>Country:</strong> ${country}<br>
-                                                <strong>Year:</strong> ${d.Year}<br>
-                                                <strong>Life Expectancy:</strong> ${d.Life_expectancy}<br>
-                                                <strong>% Vaccinated:</strong> ${d['%vaccinated']}<br>
-                                                <strong>% GDP:</strong> ${d['%gdpa']}
-                                            `)
-                                            .style("left", `${event.pageX + 10}px`)
-                                            .style("top", `${event.pageY + 10}px`);
-                                    })
-                                    .on("mouseout", () =>  {
-                                        tooltip.style("display", "none");
-
-                                    if (mouseOutTimeout) return; // If a timeout is active, do nothing
-
-                                    mouseOutTimeout = setTimeout(() => {
-                                        mouseOutTimeout = null; // Reset the timeout after execution
-                                        animationRunning = true;
-                                        // currentYear=currentYear+1
-                                        renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
-                                        // Your logic for mouseout
-                                        tooltip.style("display", "none");
-                                        console.log("Mouse out logic executed after 2 seconds delay");
-                                    }, 2000); // 2-second delay
-                                })
-                                    .transition()
-                                    .duration(2000)
-                                    .ease(d3.easeCubicInOut)
-                                    .attr("cx", xScale(nextData[xFeature]))
-                                    .attr("cy", yScale(nextData[yFeature]))
-                                    .on("end", () => {
-                // After animations are done, update currentYear and restart
-                
-                yearInput.value = currentYear; 
-                currentYear = nextYear;// Sync input with animation
-                setTimeout(animate, 5000); // Wait before moving to the next frame
-            });
-
-                            ;
-                            }
-                        }
-
-                        animate();
-                    }
-                });
-            }
-            
-            toggleCollapseButton.addEventListener("click", () => {
-    isCollapsed = !isCollapsed;
-    toggleCollapseButton.textContent = isCollapsed ? "Expand" : "Collapse";
-    renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
-});
-            toggleAnimationButton.addEventListener("click", () => {
-                animationRunning = !animationRunning;
-                toggleAnimationButton.textContent = animationRunning ? "Stop Animation" : "Resume Animation";
-                if (animationRunning) {
-                    renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
-                }
-            });
-
-            document.getElementById("set-year").addEventListener("click", () => {
-                const year = +yearInput.value;
-                if (year >= 2000 && year <= 2020) {
-                    currentYear = year;
-                    // yearInput.value = currentYear;
-                    renderChart(xAxisDropdown.value, yAxisDropdown.value, sizeDropdown.value);
-                }
-            });
-
-            legendContainer.selectAll(".legend-item")
-                .data(countries)
-                .join("div")
-                .attr("class", "legend-item")
-                .html(d => `
-                    <div class="legend-circle" style="background:${colorScale(d)}"></div>
-                    <span>${d}</span>
-                `)
-                .on("click", function (event, country) {
-                    if (hiddenCountries.has(country)) {
-                        hiddenCountries.delete(country);
-                        d3.select(this).style("opacity", 1);
-                    } else {
-                        hiddenCountries.add(country);
-                        d3.select(this).style("opacity", 0.5);
-                    }
-                    updateScales();
-                });
-
-            d3.select("#select-all").on("click", function () {
-                if (hiddenCountries.size > 0) {
-                    hiddenCountries.clear();
-                    d3.selectAll(".legend-item").style("opacity", 1);
-                } else {
-                    countries.forEach(country => hiddenCountries.add(country));
-                    d3.selectAll(".legend-item").style("opacity", 0.5);
-                }
-                updateScales();
-            });
-
-            d3.select("#legend-search").on("input", function () {
-                const searchText = this.value.toLowerCase();
-                legendContainer.selectAll(".legend-item")
-                    .style("display", d => d.toLowerCase().includes(searchText) ? "flex" : "none");
-            });
-
-            xAxisDropdown.addEventListener("change", updateScales);
-            yAxisDropdown.addEventListener("change", updateScales);
-            sizeDropdown.addEventListener("change", updateScales);
-
-            updateScales();
+    function initZoomBrush() {
+      zoom = d3
+        .zoom()
+        .scaleExtent([1, 10])
+        .translateExtent([
+          [0, 0],
+          [width + margin.right, height + margin.bottom],
+        ])
+        .on("zoom", ({ transform }) => {
+          svg.select("g").attr("transform", transform);
         });
-    
-    </script>
+
+      brush = d3
+        .brush()
+        .extent([
+          [0, 0],
+          [width, height],
+        ])
+        .on("end", brushed);
+
+      svg
+        .append("g")
+        .attr("class", "brush")
+        .call(brush);
+
+      function brushed(event) {
+        const selection = event.selection;
+        if (!selection) return;
+
+        const [[x0, y0], [x1, y1]] = selection;
+        const xFeature = xAxisDropdown.value;
+        const yFeature = yAxisDropdown.value;
+
+        xScale.domain([xScale.invert(x0), xScale.invert(x1)]);
+        yScale.domain([yScale.invert(y1), yScale.invert(y0)]);
+
+        xAxisGroup.transition().duration(500).call(d3.axisBottom(xScale));
+        yAxisGroup.transition().duration(500).call(d3.axisLeft(yScale));
+
+        svg.select(".brush").call(brush.move, null);
+
+        renderChart(xFeature, yFeature, sizeDropdown.value);
+      }
+    }
+
+    function renderChart(xFeature, yFeature, sizeFeature) {
+      svg.selectAll(".trail").remove();
+      svg.selectAll(".circle").remove();
+      svg.selectAll(".mark").remove();
+      svg.selectAll(".exploding-group").remove();
+
+      if (!isCollapsed) {
+        svg.selectAll(".collapsed-circle").remove();
+      }
+
+      if (isCollapsed) {
+        animateCollapsed();
+        return;
+      }
+
+      let nextYear = currentYear < 2020 ? currentYear + 1 : 2000;
+      let finishedCount = 0;
+      const visibleCountries = countries.filter((c) => !hiddenCountries.has(c));
+
+      visibleCountries.forEach((country) => {
+        const cData = dataSet.find((d) => d.Year === currentYear && d.Entity === country);
+        const nData = dataSet.find((d) => d.Year === nextYear && d.Entity === country);
+
+        if (!cData) {
+          finishedCount++;
+          if (finishedCount === visibleCountries.length) finalizeYearStep(nextYear);
+          return;
+        }
+
+        const trail = svg.append("g").attr("class", "trail");
+        const marks = svg.append("g").attr("class", "marks");
+
+        function animateCountry() {
+          if (!animationRunning) return;
+
+          marks.selectAll("circle").remove();
+
+          // line
+          if (nData) {
+            trail
+              .append("line")
+              .attr("x1", xScale(cData[xFeature]))
+              .attr("y1", yScale(cData[yFeature]))
+              .attr("x2", xScale(cData[xFeature]))
+              .attr("y2", yScale(cData[yFeature]))
+              .attr("stroke", colorScale(country))
+              .attr("stroke-width", sizeScale(cData[sizeFeature]))
+              .style("stroke-opacity", 0.3)
+              .transition()
+              .duration(2000)
+              .ease(d3.easeCubicInOut)
+              .attr("x2", xScale(nData[xFeature]))
+              .attr("y2", yScale(nData[yFeature]))
+              .on("end", function () {
+                d3.select(this)
+                  .transition()
+                  .duration(1000)
+                  .style("stroke-opacity", 0)
+                  .remove();
+              });
+          }
+
+          // circle
+          let circle = marks
+            .append("circle")
+            .attr("class", "circle")
+            .attr("r", sizeScale(cData[sizeFeature]))
+            .style("fill", colorScale(country))
+            .attr("cx", xScale(cData[xFeature]))
+            .attr("cy", yScale(cData[yFeature]))
+            .on("mouseover", function (event) {
+              animationRunning = false;
+              tooltip
+                .style("display", "block")
+                .html(`
+                <strong>Country:</strong> ${country}<br>
+                <strong>Year:</strong> ${cData.Year}<br>
+                <strong>Life Expectancy:</strong> ${cData.Life_expectancy}<br>
+                <strong>% Vaccinated:</strong> ${cData["%vaccinated"]}<br>
+                <strong>% GDP:</strong> ${cData["%gdpa"]}
+              `)
+                .style("left", `${event.pageX + 10}px`)
+                .style("top", `${event.pageY + 10}px`);
+            })
+            .on("mouseout", () => {
+              tooltip.style("display", "none");
+              animationRunning = true; // re-enable animation
+            });
+
+          if (!nData) {
+            finishedCount++;
+            if (finishedCount === visibleCountries.length) finalizeYearStep(nextYear);
+            return;
+          }
+
+          // Animate from cData => nData
+          circle
+            .transition()
+            .duration(2000)
+            .ease(d3.easeCubicInOut)
+            .attr("cx", xScale(nData[xFeature]))
+            .attr("cy", yScale(nData[yFeature]))
+            .on("end", () => {
+              finishedCount++;
+              if (finishedCount === visibleCountries.length) {
+                finalizeYearStep(nextYear);
+              }
+            });
+        }
+
+        animateCountry();
+      });
+    }
+
+    // We'll store timeouts for normal mode vs collapsed
+    function finalizeYearStep(nextYear){
+      currentYear = nextYear;
+      yearInput.value = currentYear;
+      if(animationRunning && !isCollapsed){ // Only continue normal mode if not collapsed
+        // Clear old normalModeTimeout before setting a new one
+        if (normalModeTimeout) {
+          clearTimeout(normalModeTimeout);
+        }
+        normalModeTimeout = setTimeout(() => {
+          renderChart(
+            xAxisDropdown.value,
+            yAxisDropdown.value,
+            sizeDropdown.value
+          );
+        }, 5000);
+      }
+    }
+
+    function animateCollapsed() {
+      const xFeature = xAxisDropdown.value;
+      const yFeature = yAxisDropdown.value;
+      const sizeFeature = sizeDropdown.value;
+
+      const visibleData = dataSet.filter(
+        (d) => !hiddenCountries.has(d.Entity) && d.Year === currentYear
+      );
+
+      if (visibleData.length > 0) {
+        const avgX = d3.mean(visibleData, (d) => d[xFeature]);
+        const avgY = d3.mean(visibleData, (d) => d[yFeature]);
+        const avgSize = d3.mean(visibleData, (d) => d[sizeFeature]);
+
+        svg
+          .selectAll(".collapsed-circle")
+          .data([1])
+          .join("circle")
+          .attr("class", "collapsed-circle circle")
+          .transition()
+          .duration(1000)
+          .attr("cx", xScale(avgX))
+          .attr("cy", yScale(avgY))
+          .attr("r", sizeScale(avgSize))
+          .style("fill", "gray")
+          .style("opacity", 0.7);
+
+        let collapsedCircle = svg.selectAll(".collapsed-circle");
+        collapsedCircle
+          .on("mouseover", function (event) {
+            d3.select(this)
+              .transition()
+              .duration(200)
+              .attr("r", sizeScale(avgSize) * 1.2);
+            tooltip
+              .style("display", "block")
+              .html(`
+              <strong>${xFeature}:</strong> ${avgX.toFixed(2)}<br>
+              <strong>Year:</strong> ${currentYear}<br>
+              <strong>${yFeature}:</strong> ${avgY.toFixed(2)}<br>
+              <strong>${sizeFeature}:</strong> ${avgSize.toFixed(2)}
+            `)
+              .style("left", `${event.pageX + 10}px`)
+              .style("top", `${event.pageY + 10}px`);
+          })
+          .on("mouseout", function () {
+            d3.select(this)
+              .transition()
+              .duration(200)
+              .attr("r", sizeScale(avgSize));
+            tooltip.style("display", "none");
+          });
+      }
+
+      currentYear = currentYear < 2020 ? currentYear + 1 : 2000;
+      yearInput.value = currentYear;
+      if (animationRunning && isCollapsed) {
+        // Clear old collapsedModeTimeout before setting a new one
+        if (collapsedModeTimeout) {
+          clearTimeout(collapsedModeTimeout);
+        }
+        collapsedModeTimeout = setTimeout(() => {
+          if (isCollapsed) animateCollapsed();
+        }, 5000);
+      }
+    }
+  </script>
 </body>
 </html>
